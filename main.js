@@ -19,6 +19,11 @@ const RED = 0xFF0000
 
 const GUILD_ID = '433080296057864192'
 const ADMIN_ID = '313850299838365698'
+const MANAGEMENT_CATEGORY_ID = '433105370962198530'
+
+// checkoff spreadsheet
+const SPREADSHEET_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
+const SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
 
 // converts a number into emojis that represent it
 function num_to_emoji(num) {
@@ -30,13 +35,52 @@ function num_to_emoji(num) {
     return str
 }
 
+function is_facilitator(member) {
+    return member && member.roles && (member.roles.find("name", "Facilitator") || member.roles.find("name", "Moderator"))
+}
+
+function is_management_channel(channel) {
+    return MANAGEMENT_CATEGORY_ID === channel.parentID
+}
+
+function gapi_connect(callback) {
+    // initialize google api oAuth2 client
+    fs.readFile('gapi_credentials.json', (err, content) => {
+        const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
+        const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
+        fs.readFile(TOKEN_PATH, (err, token) => {
+            oAuth2Client.setCredentials(JSON.parse(token))
+            const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
+            sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: 'Sheet1!A:Z',
+            }, (err, res) => {
+                if (err) return console.log('API Error: ' + err)
+                const rows = res.data.values
+                callback(rows)
+            })
+        })
+    })
+}
+
+function list_labs(message) {
+    gapi_connect(rows => {
+        const headers = rows[0].slice(SKIP_HEADERS)
+        const embed = new RichEmbed()
+            .setTitle(':white_check_mark: Labs:')
+            .setColor(LIGHT_BLUE)
+            .setDescription(headers.join('\n'))
+        message.channel.send(embed)
+    })
+}
+
 function introduce_server(user) {
     const msg = 'This is the Discord server for the Game Design and Development club at Berkeley. '
         + 'If you\'re interested in making games, this is the place for you. We look forward to working with you :smile:\n\n'
         + 'Please read #welcome-and-rules and #apply-for-role.'
 
     const embed = new RichEmbed()
-        .setTitle(':game_die: Welcome to GDD!')
+        .setTitle(':game_die: Welcome to GDD! :bear:')
         .setColor(LIGHT_BLUE)
         .setDescription(msg)
     user.send(embed)
@@ -142,7 +186,7 @@ client.on('message', message => {
     }
 
     const args = message.content.match(/(?:[^\s"]+|"[^"]*")+/gi)
-    if (args.length < 1) {
+    if (!args) {
         return
     }
 
@@ -268,74 +312,138 @@ client.on('message', message => {
         const embed = new RichEmbed()
             .setTitle(':question: GDDBot Commands:')
             .setColor(LIGHT_BLUE)
-            .setDescription('**Roll a dice:** /dice\n'
-                + '**Poll the channel:** /poll\n'
-                + '**Lab Checkoffs** (decal only): /lab\n')
+            .setDescription('Roll a dice: `/dice`\n'
+                + 'Poll the channel: `/poll`\n'
+                + 'Lab Checkoffs (decal only): `/lab`\n'
+                + 'Add/Remove Role: `/role`\n')
             .setFooter('Made by Logikable#6019 for GDD :)')
         message.channel.send(embed)
     } else if (args[0] === '/checkoff' || args[0] === '/lab') {
-        // if (!sheets) {
-        //     const embed = new RichEmbed()
-        //         .setTitle(':exclamation: Checkoff error:')
-        //         .setColor(RED)
-        //         .setDescription('Please notify Logikable#6019...')
-        //     message.author.send(embed)
-        //     return
-        // }
-        // initialize google api oAuth2 client
-        fs.readFile('gapi_credentials.json', (err, content) => {
-            const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
-            const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
-            fs.readFile(TOKEN_PATH, (err, token) => {
-                oAuth2Client.setCredentials(JSON.parse(token))
-                const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
-                sheets.spreadsheets.values.get({
-                    spreadsheetId: '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk',
-                    range: 'Sheet1!A:Z',
-                }, (err, res) => {
-                    if (err) return console.log('API Error: ' + err)
-                    const rows = res.data.values
-                    const headers = rows[0]
-                    const tag = message.author.tag
-
+        gapi_connect(rows => {
+            if (args.length > 1 && is_management_channel(message.channel)) {
+                const headers = rows[0]
+                let index;
+                if (args[1].match(/^help$/i)) {
+                    const embed = new RichEmbed()
+                        .setTitle(':white_check_mark: /lab help:')
+                        .setColor(LIGHT_BLUE)
+                        .setDescription('List labs: `/lab list`\n'
+                            + 'Missing >1 lab: `/lab missing`\n'
+                            + 'Specific student: `/lab <student_name>`\n'
+                            + 'Specific lab: `/lab <lab_name>`')
+                    message.channel.send(embed)
+                    return
+                }
+                if (args[1].match(/^list$/i)) {
+                    list_labs(message)
+                    return
+                }
+                if (args[1].match(/^missing$/i)) {  // check for missing at least one lab
+                    let incomplete = []
                     for (let row of rows.slice(1)) {
-                        if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
-                            let incomplete = []
-                            let complete = []
-                            for (let index = 2; index < headers.length; index += 1) {
-                                if (index < row.length && row[index]) {
-                                    complete.push(headers[index])
-                                } else {
-                                    incomplete.push(headers[index])
-                                }
+                        for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                            if (!(index < row.length && row[index])) {
+                                incomplete.push(row[1])
+                                break
                             }
-                            const embed = new RichEmbed()
-                                .setTitle(':white_check_mark: Lab checkoff list:')
-                                .setColor(LIGHT_BLUE)
-                                .setDescription(((incomplete.length == 0) ?
-                                        '**Congrats! You\'re all caught up.**' :
-                                        '**Incomplete labs: ' + incomplete.join(', ') + '**')
-                                    + '\n'
-                                    + 'Completed labs: ' + complete.join(', '))
-                                .setFooter('Please notify a facilitator if something is wrong!')
-                            message.author.send(embed)
-                            return
                         }
                     }
-                    // never found their username
                     const embed = new RichEmbed()
-                        .setTitle(':exclamation: Checkoff error:')
-                        .setColor(RED)
-                        .setDescription('This command is for people currently in the decal. '
-                            + 'If you\'re in the decal but this message is showing, let a facilitator know.')
+                        .setTitle(':white_check_mark: Students missing at least one lab:')
+                        .setColor(LIGHT_BLUE)
+                        .setDescription((incomplete.length === 0) ?
+                                '**None!** All students are done!' :
+                                incomplete.join('\n'))
+                    message.channel.send(embed)
+                    return
+                }
+                const args_str = args.slice(1).join(' ')
+                for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                    if (args_str.toLowerCase() === headers[index].toLowerCase()) {   // found header
+                        let incomplete = []
+                        for (let row of rows.slice(1)) {
+                            if (!row[index]) {
+                                incomplete.push(row[1] +
+                                    (row[0] ? ' [@' + row[0] + ']' : ''))
+                            }
+                        }
+                        const embed = new RichEmbed()
+                            .setTitle(':white_check_mark: Students missing ' + headers[index] + ':')
+                            .setColor(LIGHT_BLUE)
+                            .setDescription((incomplete.length === 0) ?
+                                    '**None!** All students are done!' :
+                                    incomplete.join('\n'))
+                        message.channel.send(embed)
+                        return
+                    }
+                }
+                // if not the first two cases, then check for name
+                for (let row of rows.slice(1)) {
+                    if (row[1] && args_str.toLowerCase() === row[1].toLowerCase()) {
+                        let incomplete = []
+                        for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                            if (!(index < row.length && row[index])) {
+                                incomplete.push(headers[index])
+                            }
+                        }
+                        const embed = new RichEmbed()
+                            .setTitle(':white_check_mark: ' + row[1] + ' is missing:')
+                            .setColor(LIGHT_BLUE)
+                            .setDescription((incomplete.length === 0) ? 
+                                    'Nothing!' :
+                                    incomplete.join('\n'))
+                        message.channel.send(embed)
+                        return
+                    }
+                }
+                // if neither lab nor student was found
+                const embed = new RichEmbed()
+                    .setTitle(':exclamation: Lab command error:')
+                    .setColor(RED)
+                    .setDescription('Student or lab name was not found')
+                message.channel.send(embed)
+                return
+            }
+            // default functionality for students
+            const headers = rows[0]
+            const tag = message.author.tag
+
+            for (let row of rows.slice(1)) {
+                if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
+                    let incomplete = []
+                    let complete = []
+                    for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                        if (index < row.length && row[index]) {
+                            complete.push(headers[index])
+                        } else {
+                            incomplete.push(headers[index])
+                        }
+                    }
+                    const embed = new RichEmbed()
+                        .setTitle(':white_check_mark: Lab checkoff list:')
+                        .setColor(LIGHT_BLUE)
+                        .setDescription(((incomplete.length === 0) ?
+                                '**Congrats! You\'re all caught up.**' :
+                                '**Incomplete labs:**\n' + incomplete.join('\n'))
+                            + '\n\n'
+                            + '**Completed labs:** ' + complete.join(', '))
+                        .setFooter('Please notify a facilitator if something is wrong!')
                     message.author.send(embed)
-                })
-            })
+                    return
+                }
+            }
+            // never found their username
+            const embed = new RichEmbed()
+                .setTitle(':exclamation: Checkoff error:')
+                .setColor(RED)
+                .setDescription('This command is for people currently in the decal. '
+                    + 'If you\'re in the decal but this message is showing, let a facilitator know.')
+            message.author.send(embed)
         })
     } else if (args[0] === '/intro') {
         introduce_server(message.author)
     } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
-            && ['433105512675016716', '433105674675814430', '433105785468485662', '488062770194153473', '455609253617729546'].includes(message.channel.id)) {
+            && is_management_channel(message.channel)) {
         const wes_list = ['welsey', 'weesley', 'weasley', 'weaslely', 'weasel-y', 'weselely']
         const random_wes = wes_list[Math.floor(Math.random() * wes_list.length)]
         message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
@@ -359,6 +467,8 @@ client.on('message', message => {
         } else {
             help_role(message)
         }
+    } else if (args[0] === '/labs' && is_management_channel(message.channel)) {
+        list_labs(message)
     }
 })
 
