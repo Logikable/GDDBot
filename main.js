@@ -320,10 +320,8 @@ client.on('message', message => {
         message.channel.send(embed)
     } else if (args[0] === '/checkoff' || args[0] === '/lab') {
         gapi_connect(rows => {
-            if (args.length > 1 && is_management_channel(message.channel)) {
-                const headers = rows[0]
-                let index;
-                if (args[1].match(/^help$/i)) {
+            if (is_facilitator(message.member) && is_management_channel(message.channel)) {
+                if (args.length === 1 || args[1].match(/^help$/i)) {
                     const embed = new RichEmbed()
                         .setTitle(':white_check_mark: /lab help:')
                         .setColor(LIGHT_BLUE)
@@ -338,6 +336,7 @@ client.on('message', message => {
                     list_labs(message)
                     return
                 }
+                const headers = rows[0]
                 if (args[1].match(/^missing$/i)) {  // check for missing at least one lab
                     let incomplete = []
                     for (let row of rows.slice(1)) {
@@ -442,11 +441,11 @@ client.on('message', message => {
         })
     } else if (args[0] === '/intro') {
         introduce_server(message.author)
-    } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
-            && is_management_channel(message.channel)) {
-        const wes_list = ['welsey', 'weesley', 'weasley', 'weaslely', 'weasel-y', 'weselely']
-        const random_wes = wes_list[Math.floor(Math.random() * wes_list.length)]
-        message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
+    // } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
+    //         && is_management_channel(message.channel)) {
+    //     const wes_list = ['welsey', 'weesley', 'weasley', 'weaslely', 'weasel-y', 'weselely']
+    //     const random_wes = wes_list[Math.floor(Math.random() * wes_list.length)]
+    //     message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
     } else if (args[0] === '/addrole') {
         if (args.length === 1) {
             help_role(message)
