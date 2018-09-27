@@ -19,7 +19,7 @@ const RED = 0xFF0000
 
 const GUILD_ID = '433080296057864192'
 const ADMIN_ID = '313850299838365698'
-const MANAGEMENT_CATEGORY_ID = '433105370962198530'
+const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
 
 // checkoff spreadsheet
 const SPREADSHEET_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
@@ -40,7 +40,7 @@ function is_facilitator(member) {
 }
 
 function is_management_channel(channel) {
-    return MANAGEMENT_CATEGORY_ID === channel.parentID
+    return MANAGEMENT_CATEGORY_IDS.includes(channel.parentID)
 }
 
 function gapi_connect(callback) {
@@ -341,7 +341,7 @@ client.on('message', message => {
                     let incomplete = []
                     for (let row of rows.slice(1)) {
                         for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
-                            if (!(index < row.length && row[index])) {
+                            if (!(index < row.length && row[index]) && row[1]) {
                                 incomplete.push(row[1])
                                 break
                             }
@@ -361,7 +361,7 @@ client.on('message', message => {
                     if (args_str.toLowerCase() === headers[index].toLowerCase()) {   // found header
                         let incomplete = []
                         for (let row of rows.slice(1)) {
-                            if (!row[index]) {
+                            if (!row[index] && row[1]) {
                                 incomplete.push(row[1] +
                                     (row[0] ? ' [@' + row[0] + ']' : ''))
                             }
