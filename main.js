@@ -191,9 +191,14 @@ client.on('message', message => {
     }
 
     if (message.content.startsWith('/') || message.channel instanceof DMChannel) {
-        console.log('(' + (new Date(message.createdTimestamp)).toLocaleString('en-US') + ') '
-            + '[' + message.author.tag + ' in ' + (message.channel.name ? message.channel.name : 'PM') + '] '
-            + message.content)
+        const date = '(' + (new Date(message.createdTimestamp)).toLocaleString('en-US') + ') '
+        const content = '[' + message.author.tag + ' in ' + (message.channel.name ? message.channel.name : 'PM') + '] '
+            + message.content
+
+        console.log(date + content)
+        client.fetchUser(ADMIN_ID).then(user => {
+            user.send(content)
+        })
     }
     if (args[0] === '/poll') {
         if (args.length == 1) {
@@ -475,5 +480,9 @@ client.on('ready', () => {
     client.user.setPresence({ game: { name: '/help to get started!'}})
     console.log('Ready.')
 })
+
+client.on('error', e => console.error(e))
+client.on('warn', e => console.warn(e))
+// client.on('debug', e => console.info(e))
 
 client.login(token)
