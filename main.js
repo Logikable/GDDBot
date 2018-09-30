@@ -1,3 +1,11 @@
+/*
+TODO:
+global support for quoted arguments (/addrole)
+improved + consistent help command (/help <command>, /<command> help)
+be able to edit/send/delete bot messages by id/channel_id
+edit existing polls
+*/
+
 // reqs
 const fs = require('fs')
 const sleep = require('system-sleep')
@@ -17,8 +25,8 @@ const VOTE_EMOJIS = ['\u0031\u20E3', '\u0032\u20E3', '\u0033\u20E3', '\u0034\u20
 const LIGHT_BLUE = 0xADD8E6
 const RED = 0xFF0000
 
-const GUILD_ID = '433080296057864192'
-const ADMIN_ID = '313850299838365698'
+const GUILD_IDS = ['433080296057864192', '317420684689276928']
+const ADMIN_IDS = ['313850299838365698']
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
 
 // checkoff spreadsheet
@@ -97,12 +105,14 @@ function can_only_be_used_in_guild(channel) {
 // returns a role, returning null if not found
 function parse_role(message, args) {
     const args_str = args.join(' ')
-    if (args_str.match(/^league(?:\s?of\s?legends?)?|lol$/i)) {
+    if (args_str.match(/^league(?:\s*of\s*legends?)?|lol$/i)) {
         return message.guild.roles.find("name", "League of Legends")
     } else if (args_str.match(/^overwatch|ow$/i)) {
         return message.guild.roles.find("name", "Overwatch")
-    } else if (args_str.match(/^gwent$/i)) {
-        return message.guild.roles.find("name", "Gwent")
+    } else if (args_str.match(/^civ\s*\d?$/i)) {
+        return message.guild.roles.find("name", "Civ")
+    } else if (args_str.match(/^tetris$/i)) {
+        return message.guild.roles.find("name", "Tetris")
     }
     return null
 }
@@ -117,7 +127,7 @@ function role_not_found(channel) {
 }
 
 function add_role(message, args) {
-    if (!message.guild || message.guild.id !== GUILD_ID) {
+    if (!message.guild || !GUILD_IDS.includes(message.guild.id)) {
         can_only_be_used_in_guild(message.channel)
         return
     }
@@ -142,7 +152,7 @@ function add_role(message, args) {
 }
 
 function remove_role(message, args) {
-    if (!message.guild || message.guild.id !== GUILD_ID) {
+    if (!message.guild || !GUILD_IDS.includes(message.guild.id)) {
         can_only_be_used_in_guild(message.channel)
         return
     }
@@ -185,7 +195,8 @@ client.on('message', message => {
         return
     }
 
-    const args = message.content.match(/(?:[^\s"]+|"[^"]*")+/gi)
+    let args = message.content.match(/(?:[^\s"]+|"[^"]+")/gi)
+    args = args.map(x => x.replace(/\"/gi, ''))
     if (!args) {
         return
     }
@@ -196,9 +207,11 @@ client.on('message', message => {
             + message.content
 
         console.log(date + content)
-        client.fetchUser(ADMIN_ID).then(user => {
-            user.send(content)
-        })
+        for (let admin_id of ADMIN_IDS) {
+            client.fetchUser(admin_id).then(user => {
+                user.send(content)
+            }).catch(e => console.log(e))
+        }
     }
     if (args[0] === '/poll') {
         if (args.length == 1) {
