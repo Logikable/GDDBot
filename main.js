@@ -1,9 +1,10 @@
 /*
 TODO:
-improved + consistent help command (/help <command>, /<command> help)
 be able to edit/send/delete bot messages by id/channel_id
 edit existing polls
 */
+
+/*** Global Variables ***/
 
 // reqs
 const fs = require('fs')
@@ -31,6 +32,8 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
 // checkoff spreadsheet
 const SPREADSHEET_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
 const SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
+
+/*** Utility Functions ***/
 
 // converts a number into emojis that represent it
 function num_to_emoji(num) {
@@ -70,6 +73,60 @@ function gapi_connect(callback) {
     })
 }
 
+// returns a role, returning null if not found
+function parse_role(message, args) {
+    const args_str = args.join(' ')
+    if (args_str.match(/^league(?:\s*of\s*legends?)?|lol$/i)) {
+        return message.guild.roles.find("name", "League of Legends")
+    } else if (args_str.match(/^overwatch|ow$/i)) {
+        return message.guild.roles.find("name", "Overwatch")
+    } else if (args_str.match(/^civ\s*\d?$/i)) {
+        return message.guild.roles.find("name", "Civ")
+    } else if (args_str.match(/^tetris$/i)) {
+        return message.guild.roles.find("name", "Tetris")
+    }
+    return null
+}
+
+/*** Help Functions ***/
+
+function help_poll(channel) {
+    const embed = new RichEmbed()
+        .setTitle(':bar_chart: Poll usage:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('**Yes / No**\n/poll "Boba?"\n**Multi answer (up to 10)**\n/poll "Where?" "UCha" "Asha"')
+    channel.send(embed)
+}
+
+function help_dice(channel) {
+    const embed = new RichEmbed()
+        .setTitle(':game_die: Dice usage:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('**Roll a 6 sided dice**\n/dice\n**Roll a dice with any number of faces**\n/dice 20\n**Roll a number of dice**\n/dice 4d6')
+    channel.send(embed)
+}
+
+function help_lab_facilitator(channel) {
+    const embed = new RichEmbed()
+        .setTitle(':white_check_mark: /lab help:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('List labs: `/lab list`\n'
+            + 'Missing >1 lab: `/lab missing`\n'
+            + 'Specific student: `/lab <student_name>`\n'
+            + 'Specific lab: `/lab <lab_name>`')
+    channel.send(embed)
+}
+
+function help_role(message) {
+    const embed = new RichEmbed()
+        .setTitle(':question: /role usage:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('**Adding a role**\n/role add <name of game>\n/addrole <name>\n**Removing a role**\n/role remove <name>\n/removerole <name>')
+    channel.send(embed)
+}
+
+/*** Command (Helper) Functions ***/
+
 function list_labs(message) {
     gapi_connect(rows => {
         const headers = rows[0].slice(SKIP_HEADERS)
@@ -99,21 +156,6 @@ function can_only_be_used_in_guild(channel) {
         .setColor(RED)
         .setDescription('Sorry, that command can only be used in the GDD server')
     channel.send(embed)
-}
-
-// returns a role, returning null if not found
-function parse_role(message, args) {
-    const args_str = args.join(' ')
-    if (args_str.match(/^league(?:\s*of\s*legends?)?|lol$/i)) {
-        return message.guild.roles.find("name", "League of Legends")
-    } else if (args_str.match(/^overwatch|ow$/i)) {
-        return message.guild.roles.find("name", "Overwatch")
-    } else if (args_str.match(/^civ\s*\d?$/i)) {
-        return message.guild.roles.find("name", "Civ")
-    } else if (args_str.match(/^tetris$/i)) {
-        return message.guild.roles.find("name", "Tetris")
-    }
-    return null
 }
 
 // notifies the channel
@@ -175,13 +217,7 @@ function remove_role(message, args) {
     message.channel.send(embed)
 }
 
-function help_role(message) {
-    const embed = new RichEmbed()
-        .setTitle(':question: /role usage:')
-        .setColor(LIGHT_BLUE)
-        .setDescription('**Adding a role**\n/role add <name of game>\n/addrole <name>\n**Removing a role**\n/role remove <name>\n/removerole <name>')
-    message.channel.send(embed)
-}
+/*** Client Triggers ***/
 
 client.on('guildMemberAdd', member => {
     if (!member.bot) {
@@ -214,11 +250,7 @@ client.on('message', message => {
     }
     if (args[0].match(/^\/poll$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-            const embed = new RichEmbed()
-                .setTitle(':bar_chart: Poll usage:')
-                .setColor(LIGHT_BLUE)
-                .setDescription('**Yes / No**\n/poll "Boba?"\n**Multi answer (up to 10)**\n/poll "Where?" "UCha" "Asha"')
-            message.channel.send(embed)
+            help_poll(message.channel)
         } else if (args.length > 12) {
             const embed = new RichEmbed()
                 .setTitle(':exclamation: Poll command error:')
@@ -260,11 +292,7 @@ client.on('message', message => {
         }
     } else if (args[0].match(/^\/dice$/i) || args[0].match(/^\/roll$/i)) {
         if (args.length > 2 || (args.length === 2 && args[1].match(/^help$/i))) {
-            const embed = new RichEmbed()
-                .setTitle(':game_die: Dice usage:')
-                .setColor(LIGHT_BLUE)
-                .setDescription('**Roll a 6 sided dice**\n/dice\n**Roll a dice with any number of faces**\n/dice 20\n**Roll a number of dice**\n/dice 4d6')
-            message.channel.send(embed)
+            help_dice(message.channel)
         } else {
             let dice = 1
             let d = false
@@ -326,27 +354,32 @@ client.on('message', message => {
             message.channel.send(embed)
         }
     } else if (args[0].match(/^\/help$/i) || args[0].match(/^\/commands$/i)) {
-        const embed = new RichEmbed()
-            .setTitle(':question: GDDBot Commands:')
-            .setColor(LIGHT_BLUE)
-            .setDescription('Roll a dice: `/dice`\n'
-                + 'Poll the channel: `/poll`\n'
-                + 'Lab Checkoffs (decal only): `/lab`\n'
-                + 'Add/Remove Role: `/role`\n')
-            .setFooter('Made by Logikable#6019 for GDD :)')
-        message.channel.send(embed)
+        if (args.length === 2 && args[1].match(/^poll$/i)) {
+            help_poll(message.channel)
+        } else if (args.length === 2 && (args[1].match(/^dice$/i) || args[1].match(/^roll$/i))) {
+            help_dice(message.channel)
+        } else if (args.length === 2 && args[1].match(/^lab$/i)
+                && is_facilitator(message.member)
+                && is_management_channel(message.channel)) {
+            help_lab_facilitator(message.channel)
+        } else if (args.length === 2 && args[1].match(/^role$/i)) {
+            help_role(message.channel)
+        } else {
+            const embed = new RichEmbed()
+                .setTitle(':question: GDDBot Commands:')
+                .setColor(LIGHT_BLUE)
+                .setDescription('Roll a dice: `/roll`\n'
+                    + 'Poll the channel: `/poll`\n'
+                    + 'Lab Checkoffs (decal only): `/lab`\n'
+                    + 'Add/Remove Role: `/role`\n')
+                .setFooter('Made by Logikable#6019 for GDD :)')
+            message.channel.send(embed)
+        }
     } else if (args[0].match(/^\/checkoff$/i) || args[0].match(/^\/lab$/i)) {
         gapi_connect(rows => {
             if (is_facilitator(message.member) && is_management_channel(message.channel)) {
                 if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-                    const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: /lab help:')
-                        .setColor(LIGHT_BLUE)
-                        .setDescription('List labs: `/lab list`\n'
-                            + 'Missing >1 lab: `/lab missing`\n'
-                            + 'Specific student: `/lab <student_name>`\n'
-                            + 'Specific lab: `/lab <lab_name>`')
-                    message.channel.send(embed)
+                    help_lab_facilitator(message.channel)
                     return
                 }
                 if (args[1].match(/^list$/i)) {
@@ -465,13 +498,13 @@ client.on('message', message => {
     //     message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
     } else if (args[0].match(/^\/addrole$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-            help_role(message)
+            help_role(message.channel)
         } else {
             add_role(message, args.slice(1))
         }
     } else if (args[0].match(/^\/removerole$/i) || args[0].match(/^\/deleterole$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-            help_role(message)
+            help_role(message.channel)
         } else {
             remove_role(message, args.slice(1))
         }
@@ -481,7 +514,7 @@ client.on('message', message => {
         } else if (args.length >= 3 && (args[1] === 'remove' || args[1] === 'delete')) {
             remove_role(message, args.slice(2))
         } else {
-            help_role(message)
+            help_role(message.channel)
         }
     } else if (args[0].match(/^\/labs$/i) && is_management_channel(message.channel)) {
         list_labs(message)
