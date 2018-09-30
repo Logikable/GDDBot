@@ -1,6 +1,5 @@
 /*
 TODO:
-global support for quoted arguments (/addrole)
 improved + consistent help command (/help <command>, /<command> help)
 be able to edit/send/delete bot messages by id/channel_id
 edit existing polls
@@ -196,10 +195,10 @@ client.on('message', message => {
     }
 
     let args = message.content.match(/(?:[^\s"]+|"[^"]+")/gi)
-    args = args.map(x => x.replace(/\"/gi, ''))
     if (!args) {
         return
     }
+    args = args.map(x => x.replace(/\"/gi, ''))
 
     if (message.content.startsWith('/') || message.channel instanceof DMChannel) {
         const date = '(' + (new Date(message.createdTimestamp)).toLocaleString('en-US') + ') '
@@ -213,8 +212,8 @@ client.on('message', message => {
             }).catch(e => console.log(e))
         }
     }
-    if (args[0] === '/poll') {
-        if (args.length == 1) {
+    if (args[0].match(/^\/poll$/i)) {
+        if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             const embed = new RichEmbed()
                 .setTitle(':bar_chart: Poll usage:')
                 .setColor(LIGHT_BLUE)
@@ -226,7 +225,7 @@ client.on('message', message => {
                 .setColor(RED)
                 .setDescription('Too many answers - max 10')
             message.channel.send(embed)
-        } else if (args.length == 2) {
+        } else if (args.length === 2) {
             const query = args[1]
             const embed = new RichEmbed()
                 .setTitle(':bar_chart: ' + query)
@@ -259,8 +258,8 @@ client.on('message', message => {
                 }
             })
         }
-    } else if (args[0] === '/dice' || args[0] === '/roll') {
-        if (args.length > 2) {
+    } else if (args[0].match(/^\/dice$/i) || args[0].match(/^\/roll$/i)) {
+        if (args.length > 2 || (args.length === 2 && args[1].match(/^help$/i))) {
             const embed = new RichEmbed()
                 .setTitle(':game_die: Dice usage:')
                 .setColor(LIGHT_BLUE)
@@ -270,7 +269,7 @@ client.on('message', message => {
             let dice = 1
             let d = false
             let faces = 6
-            if (args.length == 2) {
+            if (args.length === 2) {
                 let matches = args[1].match(/^(?:([1-9]\d*)?(d))?([1-9]\d*)$/i)
                 // could handle dice/face number overload in regex, but we want targeted error messages
                 if (matches) {
@@ -326,7 +325,7 @@ client.on('message', message => {
                 .setDescription(results.join('+') + ((dice == 1) ? '' : (' = ' + sum)))
             message.channel.send(embed)
         }
-    } else if (args[0] === '/help' || args[0] === '/commands') {
+    } else if (args[0].match(/^\/help$/i) || args[0].match(/^\/commands$/i)) {
         const embed = new RichEmbed()
             .setTitle(':question: GDDBot Commands:')
             .setColor(LIGHT_BLUE)
@@ -336,10 +335,10 @@ client.on('message', message => {
                 + 'Add/Remove Role: `/role`\n')
             .setFooter('Made by Logikable#6019 for GDD :)')
         message.channel.send(embed)
-    } else if (args[0] === '/checkoff' || args[0] === '/lab') {
+    } else if (args[0].match(/^\/checkoff$/i) || args[0].match(/^\/lab$/i)) {
         gapi_connect(rows => {
             if (is_facilitator(message.member) && is_management_channel(message.channel)) {
-                if (args.length === 1 || args[1].match(/^help$/i)) {
+                if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
                     const embed = new RichEmbed()
                         .setTitle(':white_check_mark: /lab help:')
                         .setColor(LIGHT_BLUE)
@@ -457,26 +456,26 @@ client.on('message', message => {
                     + 'If you\'re in the decal but this message is showing, let a facilitator know.')
             message.author.send(embed)
         })
-    } else if (args[0] === '/intro') {
+    } else if (args[0].match(/^\/intro$/i)) {
         introduce_server(message.author)
     // } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
     //         && is_management_channel(message.channel)) {
     //     const wes_list = ['welsey', 'weesley', 'weasley', 'weaslely', 'weasel-y', 'weselely']
     //     const random_wes = wes_list[Math.floor(Math.random() * wes_list.length)]
     //     message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
-    } else if (args[0] === '/addrole') {
-        if (args.length === 1) {
+    } else if (args[0].match(/^\/addrole$/i)) {
+        if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_role(message)
         } else {
             add_role(message, args.slice(1))
         }
-    } else if (args[0] === '/removerole' || args[0] === '/deleterole') {
-        if (args.length === 1) {
+    } else if (args[0].match(/^\/removerole$/i) || args[0].match(/^\/deleterole$/i)) {
+        if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_role(message)
         } else {
             remove_role(message, args.slice(1))
         }
-    } else if (args[0] === '/role') {
+    } else if (args[0].match(/^\/role$/i)) {
         if (args.length >= 3 && args[1] === 'add') {
             add_role(message, args.slice(2))
         } else if (args.length >= 3 && (args[1] === 'remove' || args[1] === 'delete')) {
@@ -484,7 +483,7 @@ client.on('message', message => {
         } else {
             help_role(message)
         }
-    } else if (args[0] === '/labs' && is_management_channel(message.channel)) {
+    } else if (args[0].match(/^\/labs$/i) && is_management_channel(message.channel)) {
         list_labs(message)
     }
 })
