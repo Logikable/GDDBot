@@ -1,5 +1,7 @@
 /*
 TODO:
+add user's name to decal commands
+poll weekly when people are free to play games
 be able to edit/send/delete bot messages by id/channel_id
 edit existing polls
 */
@@ -29,9 +31,16 @@ const GUILD_IDS = ['433080296057864192', '317420684689276928']
 const ADMIN_IDS = ['313850299838365698']
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
 
-// checkoff spreadsheet
-const SPREADSHEET_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
-const SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
+// labs checkoff spreadsheet
+const LAB_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
+const LAB_SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
+// project grading spreadsheet
+const PROJECT_ID = '10p_IHZ8la9LfLOhzxBLrTxgQwJ7Ujh0D-u0M1zUWBkY'
+const PROJECT_SKIP_HEADERS = 2  // headers in project sheet to ignore when searching project name
+// decal attendance spreadsheet
+const ATTENDANCE_ID = '1nQnH-9bT-VyJGFe7ai-Ayhrov_9Zj6WT4uuTLBxMrjc'
+const ATTENDANCE_SKIP_HEADERS = 3
+const DECAL_MEETINGS = 28   // number of decal meetings there are
 
 /*** Utility Functions ***/
 
@@ -53,7 +62,7 @@ function is_management_channel(channel) {
     return MANAGEMENT_CATEGORY_IDS.includes(channel.parentID)
 }
 
-function gapi_connect(callback) {
+function gapi_connect(callback, spreadsheet_id) {
     // initialize google api oAuth2 client
     fs.readFile('gapi_credentials.json', (err, content) => {
         const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
@@ -62,8 +71,8 @@ function gapi_connect(callback) {
             oAuth2Client.setCredentials(JSON.parse(token))
             const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
             sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'Sheet1!A:Z',
+                spreadsheetId: spreadsheet_id,
+                range: 'Sheet1!A:ZZ',
             }, (err, res) => {
                 if (err) return console.log('API Error: ' + err)
                 const rows = res.data.values
@@ -117,7 +126,7 @@ function help_lab_facilitator(channel) {
     channel.send(embed)
 }
 
-function help_role(message) {
+function help_role(channel) {
     const embed = new RichEmbed()
         .setTitle(':question: /role usage:')
         .setColor(LIGHT_BLUE)
@@ -129,13 +138,13 @@ function help_role(message) {
 
 function list_labs(message) {
     gapi_connect(rows => {
-        const headers = rows[0].slice(SKIP_HEADERS)
+        const headers = rows[0].slice(LAB_SKIP_HEADERS)
         const embed = new RichEmbed()
             .setTitle(':white_check_mark: Labs:')
             .setColor(LIGHT_BLUE)
             .setDescription(headers.join('\n'))
         message.channel.send(embed)
-    })
+    }, LAB_ID)
 }
 
 function introduce_server(user) {
@@ -165,6 +174,15 @@ function role_not_found(channel) {
         .setColor(RED)
         .setDescription('That role couldn\'t be found')
     channel.send(embed)
+}
+
+function student_not_found(author) {
+    const embed = new RichEmbed()
+        .setTitle(':exclamation: Command error:')
+        .setColor(RED)
+        .setDescription('This command is for people currently in the decal. '
+            + 'If you\'re in the decal but this message is showing, let a facilitator know.')
+    author.send(embed)
 }
 
 function add_role(message, args) {
@@ -230,11 +248,11 @@ client.on('message', message => {
         return
     }
 
-    let args = message.content.match(/(?:[^\s"]+|"[^"]+")/gi)
+    let args = message.content.match(/(?:[^\s"“”]+|["“”][^"“”]+["“”])/gi)
     if (!args) {
         return
     }
-    args = args.map(x => x.replace(/\"/gi, ''))
+    args = args.map(x => x.replace(/["“”]/gi, ''))
 
     if (message.content.startsWith('/') || message.channel instanceof DMChannel) {
         const date = '(' + (new Date(message.createdTimestamp)).toLocaleString('en-US') + ') '
@@ -390,7 +408,7 @@ client.on('message', message => {
                 if (args[1].match(/^missing$/i)) {  // check for missing at least one lab
                     let incomplete = []
                     for (let row of rows.slice(1)) {
-                        for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                        for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
                             if (!(index < row.length && row[index]) && row[1]) {
                                 incomplete.push(row[1])
                                 break
@@ -407,7 +425,7 @@ client.on('message', message => {
                     return
                 }
                 const args_str = args.slice(1).join(' ')
-                for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
                     if (args_str.toLowerCase() === headers[index].toLowerCase()) {   // found header
                         let incomplete = []
                         for (let row of rows.slice(1)) {
@@ -430,7 +448,7 @@ client.on('message', message => {
                 for (let row of rows.slice(1)) {
                     if (row[1] && args_str.toLowerCase() === row[1].toLowerCase()) {
                         let incomplete = []
-                        for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                        for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
                             if (!(index < row.length && row[index])) {
                                 incomplete.push(headers[index])
                             }
@@ -461,7 +479,7 @@ client.on('message', message => {
                 if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
                     let incomplete = []
                     let complete = []
-                    for (let index = SKIP_HEADERS; index < headers.length; index += 1) {
+                    for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
                         if (index < row.length && row[index]) {
                             complete.push(headers[index])
                         } else {
@@ -471,7 +489,10 @@ client.on('message', message => {
                     const embed = new RichEmbed()
                         .setTitle(':white_check_mark: Lab checkoff list:')
                         .setColor(LIGHT_BLUE)
-                        .setDescription(((incomplete.length === 0) ?
+                        .setDescription(
+                            'Progress: ' + complete.length + '/' + (headers.length - LAB_SKIP_HEADERS)
+                            + '\n\n'
+                            + ((incomplete.length === 0) ?
                                 '**Congrats! You\'re all caught up.**' :
                                 '**Incomplete labs:**\n' + incomplete.join('\n'))
                             + '\n\n'
@@ -482,13 +503,8 @@ client.on('message', message => {
                 }
             }
             // never found their username
-            const embed = new RichEmbed()
-                .setTitle(':exclamation: Checkoff error:')
-                .setColor(RED)
-                .setDescription('This command is for people currently in the decal. '
-                    + 'If you\'re in the decal but this message is showing, let a facilitator know.')
-            message.author.send(embed)
-        })
+            student_not_found(message.author)
+        }, LAB_ID)
     } else if (args[0].match(/^\/intro$/i)) {
         introduce_server(message.author)
     // } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
@@ -509,15 +525,82 @@ client.on('message', message => {
             remove_role(message, args.slice(1))
         }
     } else if (args[0].match(/^\/role$/i)) {
-        if (args.length >= 3 && args[1] === 'add') {
+        if (args.length >= 3 && args[1].match(/^add$/i)) {
             add_role(message, args.slice(2))
-        } else if (args.length >= 3 && (args[1] === 'remove' || args[1] === 'delete')) {
+        } else if (args.length >= 3 && (args[1].match(/^remove$/i) || args[1].match(/^delete$/i))) {
             remove_role(message, args.slice(2))
         } else {
             help_role(message.channel)
         }
     } else if (args[0].match(/^\/labs$/i) && is_management_channel(message.channel)) {
         list_labs(message)
+    } else if (args[0].match(/^\/project$/i)) {
+        gapi_connect(rows => {
+            const headers = rows[0]
+            const tag = message.author.tag
+
+            for (let row of rows.slice(1)) {
+                if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
+                    let grades = []
+                    for (let index = PROJECT_SKIP_HEADERS; index < headers.length; index += 1) {
+                        if (index < row.length) {
+                            grades.push('**' + headers[index] + '**: ' + row[index])
+                        } else {
+                            grades.push('**' + headers[index] + '**:')
+                        }
+                    }
+                    const embed = new RichEmbed()
+                        .setTitle(':white_check_mark: Project checkoff list:')
+                        .setColor(LIGHT_BLUE)
+                        .setDescription(grades.join('\n'))
+                        .setFooter('Please notify a facilitator if something is wrong!')
+                    message.author.send(embed)
+                    return
+                }
+            }
+            // never found their username
+            student_not_found(message.author)
+        }, PROJECT_ID)
+    } else if (args[0].match(/^\/attendance$/i)) {
+        gapi_connect(rows => {
+            const headers = rows[4]
+            const tag = message.author.tag
+
+            for (let row of rows.slice(5)) {
+                if (row[2] && tag.toLowerCase() === row[2].toLowerCase()) {    // found their username!
+                    let present = 0
+                    let unexcused = 0
+                    let excused = 0
+                    for (let index = ATTENDANCE_SKIP_HEADERS;
+                            index < ATTENDANCE_SKIP_HEADERS + DECAL_MEETINGS;
+                            index += 1) {
+                        if (index < row.length) {
+                            if (row[index].match(/^X$/i)) {
+                                present += 1
+                            } else if (row[index].match(/^U$/i)) {
+                                unexcused += 1
+                            } else if (row[index].match(/^E$/i)) {
+                                excused += 1
+                            }
+                        }
+                    }
+                    const embed = new RichEmbed()
+                        .setTitle(':white_check_mark: Decal attendance:')
+                        .setColor(LIGHT_BLUE)
+                        .setDescription('Present: ' + present + '\n'
+                            + 'Excused: ' + excused + '\n'
+                            + 'Unexcused: ' + unexcused
+                            + ((unexcused >= 2) ?
+                                '\n\n**Warning:** You have already used both of your unexcused absences! '
+                                    + 'Missing future classes may affect your grade.'
+                                : ''))
+                    message.author.send(embed)
+                    return
+                }
+            }
+            // never found their username
+            student_not_found(message.author)
+        }, ATTENDANCE_ID)
     }
 })
 
