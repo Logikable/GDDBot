@@ -1,6 +1,6 @@
 /*
 TODO:
-add user's name to decal commands
+ADD EVERYTHING TO /help
 poll weekly when people are free to play games
 be able to edit/send/delete bot messages by id/channel_id
 edit existing polls
@@ -29,6 +29,7 @@ const RED = 0xFF0000
 
 const GUILD_IDS = ['433080296057864192', '317420684689276928']
 const ADMIN_IDS = ['313850299838365698']
+const SUGG_RECIP_USER_IDS = ['197879504117432320', '207328564595523585']
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
 
 // labs checkoff spreadsheet
@@ -308,7 +309,7 @@ client.on('message', message => {
                 }
             })
         }
-    } else if (args[0].match(/^\/dice$/i) || args[0].match(/^\/roll$/i)) {
+    } else if (args[0].match(/^\/(?:dice|roll)$/i)) {
         if (args.length > 2 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_dice(message.channel)
         } else {
@@ -374,7 +375,7 @@ client.on('message', message => {
     } else if (args[0].match(/^\/help$/i) || args[0].match(/^\/commands$/i)) {
         if (args.length === 2 && args[1].match(/^poll$/i)) {
             help_poll(message.channel)
-        } else if (args.length === 2 && (args[1].match(/^dice$/i) || args[1].match(/^roll$/i))) {
+        } else if (args.length === 2 && (args[1].match(/^dice|roll$/i))) {
             help_dice(message.channel)
         } else if (args.length === 2 && args[1].match(/^lab$/i)
                 && is_facilitator(message.member)
@@ -388,12 +389,16 @@ client.on('message', message => {
                 .setColor(LIGHT_BLUE)
                 .setDescription('Roll a dice: `/roll`\n'
                     + 'Poll the channel: `/poll`\n'
-                    + 'Lab Checkoffs (decal only): `/lab`\n'
-                    + 'Add/Remove Role: `/role`\n')
+                    + 'Add/Remove Role: `/role`\n'
+                    + 'Suggest a Resource: `/suggest`\n'
+                    + '\n**Decal Only:**\n'
+                    + 'Lab Checkoffs: `/lab`\n'
+                    + 'Project Checkoffs: `/project`\n'
+                    + 'Attendance: `/attendance`\n')
                 .setFooter('Made by Logikable#6019 for GDD :)')
             message.channel.send(embed)
         }
-    } else if (args[0].match(/^\/checkoff$/i) || args[0].match(/^\/lab$/i)) {
+    } else if (args[0].match(/^\/(?:checkoff|lab)$/i)) {
         gapi_connect(rows => {
             if (is_facilitator(message.member) && is_management_channel(message.channel)) {
                 if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
@@ -487,7 +492,7 @@ client.on('message', message => {
                         }
                     }
                     const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Lab checkoff list:')
+                        .setTitle(':white_check_mark: Lab checkoff list for ' + row[1] + ':')
                         .setColor(LIGHT_BLUE)
                         .setDescription(
                             'Progress: ' + complete.length + '/' + (headers.length - LAB_SKIP_HEADERS)
@@ -518,7 +523,7 @@ client.on('message', message => {
         } else {
             add_role(message, args.slice(1))
         }
-    } else if (args[0].match(/^\/removerole$/i) || args[0].match(/^\/deleterole$/i)) {
+    } else if (args[0].match(/^\/(?:remove|delete)role$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_role(message.channel)
         } else {
@@ -527,14 +532,14 @@ client.on('message', message => {
     } else if (args[0].match(/^\/role$/i)) {
         if (args.length >= 3 && args[1].match(/^add$/i)) {
             add_role(message, args.slice(2))
-        } else if (args.length >= 3 && (args[1].match(/^remove$/i) || args[1].match(/^delete$/i))) {
+        } else if (args.length >= 3 && (args[1].match(/^remove|delete$/i))) {
             remove_role(message, args.slice(2))
         } else {
             help_role(message.channel)
         }
     } else if (args[0].match(/^\/labs$/i) && is_management_channel(message.channel)) {
         list_labs(message)
-    } else if (args[0].match(/^\/project$/i)) {
+    } else if (args[0].match(/^\/projects?$/i)) {
         gapi_connect(rows => {
             const headers = rows[0]
             const tag = message.author.tag
@@ -550,7 +555,7 @@ client.on('message', message => {
                         }
                     }
                     const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Project checkoff list:')
+                        .setTitle(':white_check_mark: Project checkoff list for ' + row[1] + ':')
                         .setColor(LIGHT_BLUE)
                         .setDescription(grades.join('\n'))
                         .setFooter('Please notify a facilitator if something is wrong!')
@@ -561,7 +566,7 @@ client.on('message', message => {
             // never found their username
             student_not_found(message.author)
         }, PROJECT_ID)
-    } else if (args[0].match(/^\/attendance$/i)) {
+    } else if (args[0].match(/^\/attend(?:ance)?$/i)) {
         gapi_connect(rows => {
             const headers = rows[4]
             const tag = message.author.tag
@@ -585,7 +590,7 @@ client.on('message', message => {
                         }
                     }
                     const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Decal attendance:')
+                        .setTitle(':white_check_mark: Decal attendance for ' + row[0] + ':')
                         .setColor(LIGHT_BLUE)
                         .setDescription('Present: ' + present + '\n'
                             + 'Excused: ' + excused + '\n'
@@ -594,6 +599,7 @@ client.on('message', message => {
                                 '\n\n**Warning:** You have already used both of your unexcused absences! '
                                     + 'Missing future classes may affect your grade.'
                                 : ''))
+                        .setFooter('Please notify a facilitator if something is wrong!')
                     message.author.send(embed)
                     return
                 }
@@ -601,6 +607,27 @@ client.on('message', message => {
             // never found their username
             student_not_found(message.author)
         }, ATTENDANCE_ID)
+    } else if (args[0].match(/^\/suggest(?:ion)?$/i)) {
+        const args_str = message.content.substring(args[0].length + 1)
+        const display_name = message.member.displayName; 
+        const suggestion = new RichEmbed()
+            .setTitle(':bear: This just in!')
+            .setColor(LIGHT_BLUE)
+            .setDescription('From ' + (display_name ? display_name : message.author.tag) + ': ' + args_str)
+        for (let user_id of SUGG_RECIP_USER_IDS) {  // forward to admins
+            client.users.find('id', user_id).send(suggestion)
+        }
+
+        // give the user a response
+        const embed = new RichEmbed()
+            .setTitle(':bear: Thanks for the suggestion!')
+            .setColor(LIGHT_BLUE)
+            .setDescription('Your suggestion has been forwarded.')
+        message.channel.send(embed)
+    } else if (args[0].match(/^\/pm$/i) && ADMIN_IDS.includes(message.author.id) && args.length > 2) {
+        const args_str = args.slice(2).join(' ')
+        const id = args[1]
+        client.users.find('id', id).send(args_str)
     }
 })
 
