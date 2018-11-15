@@ -27,10 +27,18 @@ const VOTE_EMOJIS = ['\u0031\u20E3', '\u0032\u20E3', '\u0033\u20E3', '\u0034\u20
 const LIGHT_BLUE = 0xADD8E6
 const RED = 0xFF0000
 
-const GUILD_IDS = ['433080296057864192', '317420684689276928']
-const ADMIN_IDS = ['313850299838365698']
-const SUGG_RECIP_USER_IDS = ['197879504117432320', '207328564595523585']
-const MANAGEMENT_CATEGORY_IDS = ['433105370962198530', '494362107417198592']
+const GUILD_IDS = ['433080296057864192',    // official GDD server
+    '317420684689276928',   // testing server
+]
+const ADMIN_IDS = ['313850299838365698',    // sean
+]
+const SUGG_RECIP_USER_IDS = ['197879504117432320',  // gabby
+    '207328564595523585',   // sabrina
+    '263763339790778369',   // wes
+]
+const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD management channel category
+    '494362107417198592',   // testing server channel category
+]
 
 // labs checkoff spreadsheet
 const LAB_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
@@ -42,6 +50,8 @@ const PROJECT_SKIP_HEADERS = 2  // headers in project sheet to ignore when searc
 const ATTENDANCE_ID = '1nQnH-9bT-VyJGFe7ai-Ayhrov_9Zj6WT4uuTLBxMrjc'
 const ATTENDANCE_SKIP_HEADERS = 3
 const DECAL_MEETINGS = 28   // number of decal meetings there are
+
+let queue = []
 
 /*** Utility Functions ***/
 
@@ -94,6 +104,8 @@ function parse_role(message, args) {
         return message.guild.roles.find("name", "Civ")
     } else if (args_str.match(/^tetris$/i)) {
         return message.guild.roles.find("name", "Tetris")
+    } else if (args_str.match(/^warframe$/i)) {
+        return message.guild.roles.find("name", "Warframe")
     }
     return null
 }
@@ -102,7 +114,7 @@ function parse_role(message, args) {
 
 function help_poll(channel) {
     const embed = new RichEmbed()
-        .setTitle(':bar_chart: Poll usage:')
+        .setTitle(':bar_chart: /poll usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('**Yes / No**\n/poll "Boba?"\n**Multi answer (up to 10)**\n/poll "Where?" "UCha" "Asha"')
     channel.send(embed)
@@ -110,7 +122,7 @@ function help_poll(channel) {
 
 function help_dice(channel) {
     const embed = new RichEmbed()
-        .setTitle(':game_die: Dice usage:')
+        .setTitle(':game_die: /dice usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('**Roll a 6 sided dice**\n/dice\n**Roll a dice with any number of faces**\n/dice 20\n**Roll a number of dice**\n/dice 4d6')
     channel.send(embed)
@@ -118,7 +130,7 @@ function help_dice(channel) {
 
 function help_lab_facilitator(channel) {
     const embed = new RichEmbed()
-        .setTitle(':white_check_mark: /lab help:')
+        .setTitle(':white_check_mark: /lab usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('List labs: `/lab list`\n'
             + 'Missing >1 lab: `/lab missing`\n'
@@ -132,6 +144,14 @@ function help_role(channel) {
         .setTitle(':question: /role usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('**Adding a role**\n/role add <name of game>\n/addrole <name>\n**Removing a role**\n/role remove <name>\n/removerole <name>')
+    channel.send(embed)
+}
+
+function help_queue(channel) {
+    const embed = new RichEmbed()
+        .setTitle(':busts_in_silhouette: /q usage:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('**Join the queue**\n/q join\n**Next person**\n/q next\n**List members**\n/q list\n**Clear queue**\n/q clear')
     channel.send(embed)
 }
 
@@ -383,6 +403,9 @@ client.on('message', message => {
             help_lab_facilitator(message.channel)
         } else if (args.length === 2 && args[1].match(/^role$/i)) {
             help_role(message.channel)
+        } else if (args.length === 2 && args[1].match(/^q(?:ueue)?$/i)
+                && is_management_channel(message.channel)) {
+            help_queue(message.channel)
         } else {
             const embed = new RichEmbed()
                 .setTitle(':question: GDDBot Commands:')
@@ -390,7 +413,9 @@ client.on('message', message => {
                 .setDescription('Roll a dice: `/roll`\n'
                     + 'Poll the channel: `/poll`\n'
                     + 'Add/Remove Role: `/role`\n'
-                    + 'Suggest a Resource: `/suggest`\n'
+                    + 'Suggest a Resource: `/suggest <suggestion>`\n'
+                    + 'Website: `/website`\n'
+                    + (is_management_channel(message.channel) ? 'Meeting Queue: `/q`\n' : '')
                     + '\n**Decal Only:**\n'
                     + 'Lab Checkoffs: `/lab`\n'
                     + 'Project Checkoffs: `/project`\n'
@@ -607,13 +632,14 @@ client.on('message', message => {
             // never found their username
             student_not_found(message.author)
         }, ATTENDANCE_ID)
-    } else if (args[0].match(/^\/suggest(?:ion)?$/i)) {
+    } else if (args[0].match(/^\/suggest(?:ion)?$/i) && args.length > 1) {
         const args_str = message.content.substring(args[0].length + 1)
-        const display_name = message.member.displayName; 
         const suggestion = new RichEmbed()
             .setTitle(':bear: This just in!')
             .setColor(LIGHT_BLUE)
-            .setDescription('From ' + (display_name ? display_name : message.author.tag) + ': ' + args_str)
+            .setDescription('From '
+                + (message.member ? message.member.displayName : message.author.tag) + ': '
+                + args_str)
         for (let user_id of SUGG_RECIP_USER_IDS) {  // forward to admins
             client.users.find('id', user_id).send(suggestion)
         }
@@ -628,6 +654,62 @@ client.on('message', message => {
         const args_str = args.slice(2).join(' ')
         const id = args[1]
         client.users.find('id', id).send(args_str)
+    } else if (args[0].match(/^\/github$/i)) {
+        const embed = new RichEmbed()
+            .setTitle(':bear: GDDBot Github link:')
+            .setColor(LIGHT_BLUE)
+            .setDescription('https://github.com/logikable/GDDBot')
+        message.channel.send(embed)
+    } else if (args[0].match(/^\/website$/i)) {
+        const embed = new RichEmbed()
+            .setTitle(':bear: GDD website link:')
+            .setColor(LIGHT_BLUE)
+            .setDescription('https://gamedesign.berkeley.edu/')
+        message.channel.send(embed)
+    } else if (args[0].match(/^\/q(?:ueue)?$/i)
+            && is_management_channel(message.channel)) {
+        if (args.length == 1 || args[1].match(/^h(?:elp)?$/i)) {
+            help_queue(message.channel)
+            return
+        }
+        if (args[1].match(/^j(?:oin)?$/i)) {
+            queue.push(message.member.displayName)
+            const embed = new RichEmbed()
+                .setTitle(':busts_in_silhouette: Queue joined')
+                .setColor(LIGHT_BLUE)
+            message.channel.send(embed)
+        } else if (args[1].match(/^n(?:ext)?$/i)) {
+            if (queue.length === 0) {
+                const embed = new RichEmbed()
+                    .setTitle(':exclamation: Queue empty')
+                    .setColor(RED)
+                message.channel.send(embed)
+            } else {
+                const next = queue.shift()
+                const embed = new RichEmbed()
+                    .setTitle(':busts_in_silhouette: Next speaker:')
+                    .setColor(LIGHT_BLUE)
+                    .setDescription(next)
+                message.channel.send(embed)
+            }
+        } else if (args[1].match(/^l(?:ist)?$/i)) {
+            list = []
+            for (let i = 0; i < queue.length; i += 1) {
+                list.push((i + 1) + '. ' + queue[i])
+            }
+            const embed = new RichEmbed()
+                .setTitle(':busts_in_silhouette: Speaker order:')
+                .setColor(LIGHT_BLUE)
+                .setDescription((list.length === 0) ? 'Queue is empty!'
+                    : list.join('\n'))
+            message.channel.send(embed)
+        } else if (args[1].match(/^c(?:lear)?$/i)) {
+            queue = []
+            const embed = new RichEmbed()
+                .setTitle(':busts_in_silhouette: Queue cleared')
+                .setColor(LIGHT_BLUE)
+            message.channel.send(embed)
+        }
     }
 })
 
