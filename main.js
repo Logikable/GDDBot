@@ -1,4 +1,24 @@
 /*
+Ideas:
+Grading Transparency (calculate P/NP)
+ - show percentage
+Move away from doc to commands. Need solutions for:
+ - lab checkoffs
+ - project grading
+ - attendance
+What information on the site could the bot make more accessible?
+ - lecture links?
+ - lab links?
+Minor topic: club stuff?
+ - role submission
+   - check if a new submission exists, ping #development
+
+Lab reminder
+ - only show labs that have been released (get from doc)
+ - store due dates to show students and to determine which labs to show
+
+Documentation README
+
 TODO:
 ADD EVERYTHING TO /help
 poll weekly when people are free to play games
@@ -116,7 +136,8 @@ function help_poll(channel) {
     const embed = new RichEmbed()
         .setTitle(':bar_chart: /poll usage:')
         .setColor(LIGHT_BLUE)
-        .setDescription('**Yes / No**\n/poll "Boba?"\n**Multi answer (up to 10)**\n/poll "Where?" "UCha" "Asha"')
+        .setDescription('Yes / No: `/poll "Boba?"`\n'
+            + 'Multi answer (up to 10): `/poll "Where?" "UCha" "Asha"`')
     channel.send(embed)
 }
 
@@ -124,7 +145,9 @@ function help_dice(channel) {
     const embed = new RichEmbed()
         .setTitle(':game_die: /dice usage:')
         .setColor(LIGHT_BLUE)
-        .setDescription('**Roll a 6 sided dice**\n/dice\n**Roll a dice with any number of faces**\n/dice 20\n**Roll a number of dice**\n/dice 4d6')
+        .setDescription('Roll a 6 sided dice: `/dice`\n'
+            + 'Roll a dice with any number of faces: `/dice d20`\n'
+            + 'Roll a number of dice: `/dice 4d6`')
     channel.send(embed)
 }
 
@@ -143,7 +166,8 @@ function help_role(channel) {
     const embed = new RichEmbed()
         .setTitle(':question: /role usage:')
         .setColor(LIGHT_BLUE)
-        .setDescription('**Adding a role**\n/role add <name of game>\n/addrole <name>\n**Removing a role**\n/role remove <name>\n/removerole <name>')
+        .setDescription('Adding a role: `/role add <game>` `/addrole <name>`\n'
+            + 'Removing a role: `/role remove <name>` `/removerole <name>`')
     channel.send(embed)
 }
 
@@ -151,7 +175,11 @@ function help_queue(channel) {
     const embed = new RichEmbed()
         .setTitle(':busts_in_silhouette: /q usage:')
         .setColor(LIGHT_BLUE)
-        .setDescription('**Join the queue**\n/q join\n**Next person**\n/q next\n**List members**\n/q list\n**Clear queue**\n/q clear')
+        .setDescription('Join the queue: `/q join`\n'
+            + 'Next speaker: `/q next`\n'
+            + 'List speakers: `/q list`\n'
+            + 'Clear queue: `/q clear`\n'
+            + 'Skip speaker: `/q skip <n>`')
     channel.send(embed)
 }
 
@@ -191,9 +219,8 @@ function can_only_be_used_in_guild(channel) {
 // notifies the channel
 function role_not_found(channel) {
     const embed = new RichEmbed()
-        .setTitle(':exclamation: Role error:')
+        .setTitle(':exclamation: That role couldn\'t be found')
         .setColor(RED)
-        .setDescription('That role couldn\'t be found')
     channel.send(embed)
 }
 
@@ -218,9 +245,8 @@ function add_role(message, args) {
     }
     if (message.member.roles.has(role.id)) {
         const embed = new RichEmbed()
-            .setTitle(':exclamation: Role error:')
+            .setTitle(':exclamation: You already have that role')
             .setColor(RED)
-            .setDescription('You already have that role')
         message.channel.send(embed)
         return
     }
@@ -243,9 +269,8 @@ function remove_role(message, args) {
     }
     if (!message.member.roles.has(role.id)) {
         const embed = new RichEmbed()
-            .setTitle(':exclamation: Role error:')
+            .setTitle(':exclamation: You don\'t have that role')
             .setColor(RED)
-            .setDescription('You don\'t have that role')
         message.channel.send(embed)
         return
     }
@@ -292,9 +317,8 @@ client.on('message', message => {
             help_poll(message.channel)
         } else if (args.length > 12) {
             const embed = new RichEmbed()
-                .setTitle(':exclamation: Poll command error:')
+                .setTitle(':exclamation: Too many answers - max 10')
                 .setColor(RED)
-                .setDescription('Too many answers - max 10')
             message.channel.send(embed)
         } else if (args.length === 2) {
             const query = args[1]
@@ -350,26 +374,23 @@ client.on('message', message => {
                     faces = parseInt(matches[2])
                 } else {
                     const embed = new RichEmbed()
-                        .setTitle(':exclamation: Dice command error:')
+                        .setTitle(':exclamation: Please enter a valid number of faces and dice')
                         .setColor(RED)
-                        .setDescription('Please enter a valid number of faces and dice')
                     message.channel.send(embed)
                     return
                 }
 
                 if (dice > 100) {
                     const embed = new RichEmbed()
-                        .setTitle(':exclamation: Dice command error:')
+                        .setTitle(':exclamation: Please use fewer than 100 dice')
                         .setColor(RED)
-                        .setDescription('Please use fewer than 100 dice')
                     message.channel.send(embed)
                     return
                 }
                 if (faces >= 1e18) {
                     const embed = new RichEmbed()
-                        .setTitle(':exclamation: Dice command error:')
+                        .setTitle(':exclamation: Please use fewer than 1 quintillion faces')
                         .setColor(RED)
-                        .setDescription('Please use fewer than 1 quintillion faces')
                     message.channel.send(embed)
                     return
                 }
@@ -495,9 +516,8 @@ client.on('message', message => {
                 }
                 // if neither lab nor student was found
                 const embed = new RichEmbed()
-                    .setTitle(':exclamation: Lab command error:')
+                    .setTitle(':exclamation: Student or lab name was not found')
                     .setColor(RED)
-                    .setDescription('Student or lab name was not found')
                 message.channel.send(embed)
                 return
             }
@@ -687,7 +707,7 @@ client.on('message', message => {
             } else {
                 const next = queue.shift()
                 const embed = new RichEmbed()
-                    .setTitle(':busts_in_silhouette: Next speaker:')
+                    .setTitle(':busts_in_silhouette: Now speaking:')
                     .setColor(LIGHT_BLUE)
                     .setDescription(next)
                 message.channel.send(embed)
@@ -709,6 +729,37 @@ client.on('message', message => {
                 .setTitle(':busts_in_silhouette: Queue cleared')
                 .setColor(LIGHT_BLUE)
             message.channel.send(embed)
+        } else if (args[1].match(/^s(?:kip)?$/i)) { // there is a number after
+            let remove_index
+            if (args.length === 2) {
+                remove_index = 0
+            } else {
+                let matches = args[2].match(/^([1-9][0-9]*)$/i)
+                if (!matches) {
+                    const embed = new RichEmbed()
+                        .setTitle(':exclamation: Invalid position in queue.')
+                        .setColor(RED)
+                    message.channel.send(embed)
+                    return
+                }
+                matches = matches.slice(1)  // ignore first match; matches entire string
+                remove_index = parseInt(matches[0]) - 1
+            }
+            if (remove_index >= queue.length) {
+                const embed = new RichEmbed()
+                    .setTitle(':exclamation: There are '
+                        + (queue.length === 0 ? 'no speakers' : 'only ' + queue.length + ' speaker(s)')
+                        + ' in queue')
+                    .setColor(RED)
+                message.channel.send(embed)
+                return
+            }
+            queue.splice(remove_index, 1)
+            const embed = new RichEmbed()
+                .setTitle(':busts_in_silhouette: Speaker removed')
+                .setColor(LIGHT_BLUE)
+            message.channel.send(embed)
+            return
         }
     }
 })
