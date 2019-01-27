@@ -12,12 +12,15 @@ What information on the site could the bot make more accessible?
 Minor topic: club stuff?
  - role submission
    - check if a new submission exists, ping #development
+   - staff can add artist/programmer/music/design
 
 Lab reminder
  - only show labs that have been released (get from doc)
  - store due dates to show students and to determine which labs to show
 
+Retention statistics
 Documentation README
+team making command
 
 TODO:
 ADD EVERYTHING TO /help
@@ -53,21 +56,20 @@ const GUILD_IDS = ['433080296057864192',    // official GDD server
 const ADMIN_IDS = ['313850299838365698',    // sean
 ]
 const SUGG_RECIP_USER_IDS = ['197879504117432320',  // gabby
-    '207328564595523585',   // sabrina
-    '263763339790778369',   // wes
+    '153372363486920704',   // tom
 ]
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD management channel category
     '494362107417198592',   // testing server channel category
 ]
 
 // labs checkoff spreadsheet
-const LAB_ID = '1O4KiEgQ82M8jNRJBbDZgC-bIXC_yiCx5Qzh6EC4JGkk'
+const LAB_ID = '1apneF7bmckVessEzOUvuFcyBrQXXPysoYtjJzVcSUcU'
 const LAB_SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
 // project grading spreadsheet
-const PROJECT_ID = '10p_IHZ8la9LfLOhzxBLrTxgQwJ7Ujh0D-u0M1zUWBkY'
+const PROJECT_ID = '1lqG49hfQy-dW6bGkekxinYzRXhRomwIh17iK1PjpKKI'
 const PROJECT_SKIP_HEADERS = 2  // headers in project sheet to ignore when searching project name
 // decal attendance spreadsheet
-const ATTENDANCE_ID = '1nQnH-9bT-VyJGFe7ai-Ayhrov_9Zj6WT4uuTLBxMrjc'
+const ATTENDANCE_ID = '1hltXIXXy0PupG02qEcDJFXPwP7NFXaj9OeC6cxzqVSM'
 const ATTENDANCE_SKIP_HEADERS = 3
 const DECAL_MEETINGS = 28   // number of decal meetings there are
 
@@ -224,6 +226,13 @@ function role_not_found(channel) {
     channel.send(embed)
 }
 
+function turn_off_invisible(channel) {
+    const embed = new RichEmbed()
+        .setTitle(':exclamation: Set your status away from `invisible` to use this command')
+        .setColor(RED)
+    channel.send(embed)
+}
+
 function student_not_found(author) {
     const embed = new RichEmbed()
         .setTitle(':exclamation: Command error:')
@@ -241,6 +250,10 @@ function add_role(message, args) {
     const role = parse_role(message, args)
     if (!role) {
         role_not_found(message.channel)
+        return
+    }
+    if (!message.member) {
+        turn_off_invisible(message.channel)
         return
     }
     if (message.member.roles.has(role.id)) {
@@ -265,6 +278,10 @@ function remove_role(message, args) {
     const role = parse_role(message, args)
     if (!role) {
         role_not_found(message.channel)
+        return
+    }
+    if (!message.member) {
+        turn_off_invisible(message.channel)
         return
     }
     if (!message.member.roles.has(role.id)) {
@@ -413,7 +430,7 @@ client.on('message', message => {
                 .setDescription(results.join('+') + ((dice == 1) ? '' : (' = ' + sum)))
             message.channel.send(embed)
         }
-    } else if (args[0].match(/^\/help$/i) || args[0].match(/^\/commands$/i)) {
+    } else if (args[0].match(/^\/help$/i) || args[0].match(/^\/command(?:s)?$/i)) {
         if (args.length === 2 && args[1].match(/^poll$/i)) {
             help_poll(message.channel)
         } else if (args.length === 2 && (args[1].match(/^dice|roll$/i))) {
@@ -674,13 +691,13 @@ client.on('message', message => {
         const args_str = args.slice(2).join(' ')
         const id = args[1]
         client.users.find('id', id).send(args_str)
-    } else if (args[0].match(/^\/github$/i)) {
+    } else if (args[0].match(/^\/git(?:hub)?$/i)) {
         const embed = new RichEmbed()
             .setTitle(':bear: GDDBot Github link:')
             .setColor(LIGHT_BLUE)
             .setDescription('https://github.com/logikable/GDDBot')
         message.channel.send(embed)
-    } else if (args[0].match(/^\/website$/i)) {
+    } else if (args[0].match(/^\/web(?:site)?$/i)) {
         const embed = new RichEmbed()
             .setTitle(':bear: GDD website link:')
             .setColor(LIGHT_BLUE)
@@ -761,6 +778,12 @@ client.on('message', message => {
             message.channel.send(embed)
             return
         }
+    } else if (args[0].match(/^\/trello$/i)) {
+        const embed = new RichEmbed()
+            .setTitle(':bear: Trello link:')
+            .setColor(LIGHT_BLUE)
+            .setDescription('https://trello.com/gddfamspring2019')
+        message.channel.send(embed)        
     }
 })
 
