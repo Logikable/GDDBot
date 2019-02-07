@@ -2,31 +2,16 @@
 Ideas:
 Grading Transparency (calculate P/NP)
  - show percentage
-Move away from doc to commands. Need solutions for:
- - lab checkoffs
- - project grading
- - attendance
-What information on the site could the bot make more accessible?
- - lecture links?
- - lab links?
 Minor topic: club stuff?
  - role submission
    - check if a new submission exists, ping #development
    - staff can add artist/programmer/music/design
 
-Lab reminder
- - only show labs that have been released (get from doc)
- - store due dates to show students and to determine which labs to show
-
-Retention statistics
-Documentation README
 team making command
+Retention statistics
 
 TODO:
-ADD EVERYTHING TO /help
-poll weekly when people are free to play games
-be able to edit/send/delete bot messages by id/channel_id
-edit existing polls
+Documentation README
 */
 
 /*** Global Variables ***/
@@ -36,6 +21,7 @@ const fs = require('fs')
 const sleep = require('system-sleep')
 const { Client, DMChannel, RichEmbed } = require('discord.js')
 const { google } = require('googleapis')
+const schedule = require('node-schedule')
 
 // google api
 const TOKEN_PATH = 'gapi_token.json'
@@ -64,13 +50,14 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD manageme
 
 // labs checkoff spreadsheet
 const LAB_ID = '1apneF7bmckVessEzOUvuFcyBrQXXPysoYtjJzVcSUcU'
-const LAB_SKIP_HEADERS = 2  // number of headers in checkoff sheet to ignore when searching lab name
+const LAB_SKIP_COLUMNS = 2  // number of headers in checkoff sheet to ignore when searching lab name
+const LAB_SKIP_ROWS = 1     // number of headers to ignore when searching lab names
 // project grading spreadsheet
 const PROJECT_ID = '1lqG49hfQy-dW6bGkekxinYzRXhRomwIh17iK1PjpKKI'
-const PROJECT_SKIP_HEADERS = 2  // headers in project sheet to ignore when searching project name
+const PROJECT_SKIP_COLUMNS = 2  // headers in project sheet to ignore when searching project name
 // decal attendance spreadsheet
 const ATTENDANCE_ID = '1hltXIXXy0PupG02qEcDJFXPwP7NFXaj9OeC6cxzqVSM'
-const ATTENDANCE_SKIP_HEADERS = 3
+const ATTENDANCE_SKIP_COLUMNS = 3
 const DECAL_MEETINGS = 28   // number of decal meetings there are
 
 let queue = []
@@ -85,6 +72,10 @@ function num_to_emoji(num) {
         num = Math.floor(num / 10)
     }
     return str
+}
+
+function is_admin(user) {
+    return ADMIN_IDS.includes(user.id)
 }
 
 function is_facilitator(member) {
@@ -189,7 +180,7 @@ function help_queue(channel) {
 
 function list_labs(message) {
     gapi_connect(rows => {
-        const headers = rows[0].slice(LAB_SKIP_HEADERS)
+        const headers = rows[LAB_SKIP_ROWS].slice(LAB_SKIP_COLUMNS)
         const embed = new RichEmbed()
             .setTitle(':white_check_mark: Labs:')
             .setColor(LIGHT_BLUE)
@@ -298,6 +289,53 @@ function remove_role(message, args) {
     message.channel.send(embed)
 }
 
+/*** Cron Jobs ***/
+
+// lab reminders
+// const lab_reminder_cron = schedule.scheduleJob('*/5 * * * * *', () => {
+const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
+    gapi_connect(rows => {
+        const today = new Date()
+
+        const raw_dates = rows[0]
+        let dates = []
+        for (let index = 0; index < raw_dates.length; index += 1) {
+            if (index < LAB_SKIP_COLUMNS) {
+                dates.push(undefined)
+            } else {
+                dates.push(new Date(raw_dates[index]))
+            }
+        }
+        const headers = rows[LAB_SKIP_ROWS]
+        for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
+            if (row[0]) {   // obviously, only ping people who are on discord
+                let incomplete = []
+                let overdue = []
+                for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
+                    // either they're missing a lab in between, or after their last finished lab
+                    if (index < row.length && !row[index] || index >= row.length) {
+                        if (today - dates[index] > 0) {
+                            overdue.push(headers[index] + ', due on ' + raw_dates[index])
+                        } else if (dates[index] - today <= 86400000 * 7) {   // if due within a week
+                            incomplete.push(headers[index] + ', due on ' + raw_dates[index])
+                        }
+                        // otherwise, ignore the lab
+                    }
+                }
+                const embed = new RichEmbed()
+                    .setTitle(':white_check_mark: Lab checkoff reminders!')
+                    .setColor(LIGHT_BLUE)
+                    .setDescription('**Overdue labs:**\n'
+                        + ((overdue.length === 0) ? 'None!' : overdue.join('\n'))
+                        + '\n\n'
+                        + '**Incomplete labs:**\n'
+                        + ((incomplete.length === 0) ? 'None!' : incomplete.join('\n')))
+                client.users.find(user => user.tag.toLowerCase() === row[0].toLowerCase()).send(embed)
+            }
+        }
+    }, LAB_ID)
+})
+
 /*** Client Triggers ***/
 
 client.on('guildMemberAdd', member => {
@@ -335,6 +373,11 @@ client.on('message', message => {
         } else if (args.length > 12) {
             const embed = new RichEmbed()
                 .setTitle(':exclamation: Too many answers - max 10')
+                .setColor(RED)
+            message.channel.send(embed)
+        } else if (args[1].length > 200) {
+            const embed = new RichEmbed()
+                .setTitle(':exclamation: Question too long, 200 characters maximum')
                 .setColor(RED)
             message.channel.send(embed)
         } else if (args.length === 2) {
@@ -472,11 +515,11 @@ client.on('message', message => {
                     list_labs(message)
                     return
                 }
-                const headers = rows[0]
+                const headers = rows[LAB_SKIP_ROWS]
                 if (args[1].match(/^missing$/i)) {  // check for missing at least one lab
                     let incomplete = []
-                    for (let row of rows.slice(1)) {
-                        for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
+                    for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
+                        for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
                             if (!(index < row.length && row[index]) && row[1]) {
                                 incomplete.push(row[1])
                                 break
@@ -493,10 +536,10 @@ client.on('message', message => {
                     return
                 }
                 const args_str = args.slice(1).join(' ')
-                for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
+                for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
                     if (args_str.toLowerCase() === headers[index].toLowerCase()) {   // found header
                         let incomplete = []
-                        for (let row of rows.slice(1)) {
+                        for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
                             if (!row[index] && row[1]) {
                                 incomplete.push(row[1] +
                                     (row[0] ? ' [@' + row[0] + ']' : ''))
@@ -513,10 +556,10 @@ client.on('message', message => {
                     }
                 }
                 // if not the first two cases, then check for name
-                for (let row of rows.slice(1)) {
+                for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
                     if (row[1] && args_str.toLowerCase() === row[1].toLowerCase()) {
                         let incomplete = []
-                        for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
+                        for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
                             if (!(index < row.length && row[index])) {
                                 incomplete.push(headers[index])
                             }
@@ -539,14 +582,14 @@ client.on('message', message => {
                 return
             }
             // default functionality for students
-            const headers = rows[0]
+            const headers = rows[LAB_SKIP_ROWS]
             const tag = message.author.tag
 
-            for (let row of rows.slice(1)) {
+            for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
                 if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
                     let incomplete = []
                     let complete = []
-                    for (let index = LAB_SKIP_HEADERS; index < headers.length; index += 1) {
+                    for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
                         if (index < row.length && row[index]) {
                             complete.push(headers[index])
                         } else {
@@ -557,7 +600,7 @@ client.on('message', message => {
                         .setTitle(':white_check_mark: Lab checkoff list for ' + row[1] + ':')
                         .setColor(LIGHT_BLUE)
                         .setDescription(
-                            'Progress: ' + complete.length + '/' + (headers.length - LAB_SKIP_HEADERS)
+                            'Progress: ' + complete.length + '/' + (headers.length - LAB_SKIP_COLUMNS)
                             + '\n\n'
                             + ((incomplete.length === 0) ?
                                 '**Congrats! You\'re all caught up.**' :
@@ -609,7 +652,7 @@ client.on('message', message => {
             for (let row of rows.slice(1)) {
                 if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
                     let grades = []
-                    for (let index = PROJECT_SKIP_HEADERS; index < headers.length; index += 1) {
+                    for (let index = PROJECT_SKIP_COLUMNS; index < headers.length; index += 1) {
                         if (index < row.length) {
                             grades.push('**' + headers[index] + '**: ' + row[index])
                         } else {
@@ -638,8 +681,8 @@ client.on('message', message => {
                     let present = 0
                     let unexcused = 0
                     let excused = 0
-                    for (let index = ATTENDANCE_SKIP_HEADERS;
-                            index < ATTENDANCE_SKIP_HEADERS + DECAL_MEETINGS;
+                    for (let index = ATTENDANCE_SKIP_COLUMNS;
+                            index < ATTENDANCE_SKIP_COLUMNS + DECAL_MEETINGS;
                             index += 1) {
                         if (index < row.length) {
                             if (row[index].match(/^X$/i)) {
@@ -687,7 +730,7 @@ client.on('message', message => {
             .setColor(LIGHT_BLUE)
             .setDescription('Your suggestion has been forwarded.')
         message.channel.send(embed)
-    } else if (args[0].match(/^\/pm$/i) && ADMIN_IDS.includes(message.author.id) && args.length > 2) {
+    } else if (args[0].match(/^\/pm$/i) && is_admin(message.author) && args.length > 2) {
         const args_str = args.slice(2).join(' ')
         const id = args[1]
         client.users.find('id', id).send(args_str)
@@ -784,6 +827,18 @@ client.on('message', message => {
             .setColor(LIGHT_BLUE)
             .setDescription('https://trello.com/gddfamspring2019')
         message.channel.send(embed)        
+    } else if (args[0].match(/^\/kill$/i)
+            && is_admin(message.author)) {
+        if (args.length === 1) {
+            return
+        }
+        if (args[1].match(/^lab_reminders$/i)) {
+            lab_reminder_cron.cancel()
+            const embed = new RichEmbed()
+                .setTitle(':skull_crossbones: Cron killed')
+                .setColor(RED)
+            message.channel.send(embed)
+        }
     }
 })
 

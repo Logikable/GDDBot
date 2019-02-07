@@ -22,7 +22,7 @@ First however, let's cover common patterns used.
 
 #### Discord Functionality
 
-By nature, Discord bots are eventful; that is, they respond when prompted by users on Discord. Most people rep       ly with a message to the channel the prompt was received from; I like to use RichEmbeds for a more professional feel. You've probably seen RichEmbeds before, they look like this:
+By nature, Discord bots are eventful; that is, they respond when prompted by users on Discord. Most people reply with a message to the channel the prompt was received from; I like to use RichEmbeds for a more professional feel. You've probably seen RichEmbeds before, they look like this:
 
 ![](https://blobscdn.gitbook.com/v0/b/gitbook-28427.appspot.com/o/assets%2F-LAEeOAJ8-CJPfZkGKqI%2F-LAEmDGzvjK634rgf6_q%2F-LAEmPBF47FJgnfBD21P%2Fembedexample2.png?generation=1523904523586976&alt=media)
 
@@ -34,8 +34,14 @@ Almost all commands follow one programming pattern: command string matching, err
 
 There is also a flow that users expect when running commands. I rarely put functionality in the parameterless command (i.e. just `/poll`), since many users run a command for the first time to learn its functionality. This should display a help menu, which users can then craft their intended command from. So far, the main exception to this rule is for aliases (e.g. `/addrole` instead of `/role add`), since the functionality is baked into the name.
 
+The command parsing logic is hierarchical. This means that the first argument is parsed first, then the rest of the command is processed by the appropriate section of the code.
+
+In addition, the help menu for any command is displayed in two ways: the parameterless command, and `/help <name>`. As such, the 
+
 ### Commands
 
 #### /poll
+
+
 
 ### Contributing
