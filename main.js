@@ -41,7 +41,7 @@ const GUILD_IDS = ['433080296057864192',    // official GDD server
 ]
 const ADMIN_IDS = ['313850299838365698',    // sean
 ]
-const SUGG_RECIP_USER_IDS = ['197879504117432320',  // gabby
+const SUGG_RECIP_USER_IDS = ['234520560355246080',  // imon
     '153372363486920704',   // tom
 ]
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD management channel category
@@ -113,12 +113,8 @@ function parse_role(message, args) {
         return message.guild.roles.find("name", "League of Legends")
     } else if (args_str.match(/^overwatch|ow$/i)) {
         return message.guild.roles.find("name", "Overwatch")
-    } else if (args_str.match(/^civ\s*\d?$/i)) {
-        return message.guild.roles.find("name", "Civ")
-    } else if (args_str.match(/^tetris$/i)) {
-        return message.guild.roles.find("name", "Tetris")
-    } else if (args_str.match(/^warframe$/i)) {
-        return message.guild.roles.find("name", "Warframe")
+    } else if (args_str.match(/^climb(?:ing)?$/i)) {
+        return message.guild.roles.find("name", "Climbing")
     }
     return null
 }
@@ -294,6 +290,8 @@ function remove_role(message, args) {
 // lab reminders
 // const lab_reminder_cron = schedule.scheduleJob('*/5 * * * * *', () => {
 const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
+    return  // turned off for this semester
+    
     gapi_connect(rows => {
         const today = new Date()
 
@@ -330,7 +328,12 @@ const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
                         + '\n\n'
                         + '**Incomplete labs:**\n'
                         + ((incomplete.length === 0) ? 'None!' : incomplete.join('\n')))
-                client.users.find(user => user.tag.toLowerCase() === row[0].toLowerCase()).send(embed)
+                const user = client.users.find(user => user.tag.toLowerCase() === row[0].toLowerCase())
+                if (user) {
+                    user.send(embed)
+                } else {
+                    console.log('Failed to send reminder to ' + row[0] + '.')
+                }
             }
         }
     }, LAB_ID)
