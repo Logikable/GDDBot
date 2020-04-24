@@ -1,7 +1,5 @@
 /*
 Ideas:
-Grading Transparency (calculate P/NP)
- - show percentage
 Minor topic: club stuff?
  - role submission
    - check if a new submission exists, ping #development
@@ -42,23 +40,47 @@ const GUILD_IDS = ['433080296057864192',    // official GDD server
 const ADMIN_IDS = ['313850299838365698',    // sean
 ]
 const SUGG_RECIP_USER_IDS = ['234520560355246080',  // imon
-    '153372363486920704',   // tom
+    '249014951295975429',   // matthew
 ]
 const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD management channel category
     '494362107417198592',   // testing server channel category
 ]
 
-// labs checkoff spreadsheet
-const LAB_ID = '1apneF7bmckVessEzOUvuFcyBrQXXPysoYtjJzVcSUcU'
-const LAB_SKIP_COLUMNS = 2  // number of headers in checkoff sheet to ignore when searching lab name
-const LAB_SKIP_ROWS = 1     // number of headers to ignore when searching lab names
-// project grading spreadsheet
-const PROJECT_ID = '1lqG49hfQy-dW6bGkekxinYzRXhRomwIh17iK1PjpKKI'
-const PROJECT_SKIP_COLUMNS = 2  // headers in project sheet to ignore when searching project name
-// decal attendance spreadsheet
-const ATTENDANCE_ID = '1hltXIXXy0PupG02qEcDJFXPwP7NFXaj9OeC6cxzqVSM'
-const ATTENDANCE_SKIP_COLUMNS = 3
-const DECAL_MEETINGS = 28   // number of decal meetings there are
+// Decal grading spreadsheet
+const GRADING_SHEET_ID = '1A_I53ZFz5kdv9vGtfBDI3cVSufHuRtwcvZXh9u64Z74'
+// All row/column numbers are 0 indexed.
+const NUM_HEADERS = 4
+const DISCORD_ID_COLUMN = 0
+const STUDENT_NAME_COLUMN = 2
+const NAME_ROW = 2
+const DUE_DATE_ROW = 3
+// Labs
+const LAB_START_COLUMN = 3
+const NUM_LABS = 6
+const LABS_TOTAL_WEIGHT = 0.1
+// Written Responses
+const WRITINGS_START_COLUMN = 20
+const NUM_WRITINGS = 8
+const WRITINGS_TOTAL_WEIGHT = 0.1
+// Projects
+const PROJECT_ONE_PART1_COLUMN = 10
+const PROJECT_ONE_PART1_WEIGHT = 0.05
+const PROJECT_ONE_PART2_COLUMN = 11
+const PROJECT_ONE_PART2_WEIGHT = 0.05
+const PROJECT_TWO_COLUMN = 12
+const PROJECT_TWO_WEIGHT = 0.1
+const PROJECT_THREE_MENTOR_EVAL_COLUMN = 13
+const PROJECT_THREE_MENTOR_EVAL_WEIGHT = 0.6 * 0.4
+const PROJECT_THREE_MENTOR_EVAL_MAX = 4
+const PROJECT_THREE_TEAM_EVAL_START_COLUMN = 14
+const PROJECT_THREE_NUM_TEAM_EVALS = 3
+const PROJECT_THREE_FINAL_SCORE_COLUMN = 17
+const PROJECT_THREE_FINAL_SCORE_WEIGHT = 0.6 * 0.2
+const PROJECTS_TOTAL_WEIGHT = 0.8
+// Attendance
+const ABSENCES_COLUMN = 30
+const PERMITTED_UNEXCUSED_ABSENCES = 2
+const UNEXCUSED_ABSENCES_DEDUCT = 0.1
 
 let queue = []
 
@@ -115,8 +137,17 @@ function parse_role(message, args) {
         return message.guild.roles.find("name", "Overwatch")
     } else if (args_str.match(/^climb(?:ing)?$/i)) {
         return message.guild.roles.find("name", "Climbing")
+    } else if (args_str.match(/^m(?:ine)?c(?:raft)?$/i)) {
+        return message.guild.roles.find("name", "Minecraft")
     }
     return null
+}
+
+function pad(str, n) {
+    if (str.length > n) {
+        return str
+    }
+    return str + Array((n - str.length) + 1).join(".")
 }
 
 /*** Help Functions ***/
@@ -137,17 +168,6 @@ function help_dice(channel) {
         .setDescription('Roll a 6 sided dice: `/dice`\n'
             + 'Roll a dice with any number of faces: `/dice d20`\n'
             + 'Roll a number of dice: `/dice 4d6`')
-    channel.send(embed)
-}
-
-function help_lab_facilitator(channel) {
-    const embed = new RichEmbed()
-        .setTitle(':white_check_mark: /lab usage:')
-        .setColor(LIGHT_BLUE)
-        .setDescription('List labs: `/lab list`\n'
-            + 'Missing >1 lab: `/lab missing`\n'
-            + 'Specific student: `/lab <student_name>`\n'
-            + 'Specific lab: `/lab <lab_name>`')
     channel.send(embed)
 }
 
@@ -173,17 +193,6 @@ function help_queue(channel) {
 }
 
 /*** Command (Helper) Functions ***/
-
-function list_labs(message) {
-    gapi_connect(rows => {
-        const headers = rows[LAB_SKIP_ROWS].slice(LAB_SKIP_COLUMNS)
-        const embed = new RichEmbed()
-            .setTitle(':white_check_mark: Labs:')
-            .setColor(LIGHT_BLUE)
-            .setDescription(headers.join('\n'))
-        message.channel.send(embed)
-    }, LAB_ID)
-}
 
 function introduce_server(user) {
     const msg = 'This is the Discord server for the Game Design and Development club at Berkeley. '
@@ -288,36 +297,29 @@ function remove_role(message, args) {
 /*** Cron Jobs ***/
 
 // lab reminders
-// const lab_reminder_cron = schedule.scheduleJob('*/5 * * * * *', () => {
 const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
-    return  // turned off for this semester
-    
+    return // turned off
+
     gapi_connect(rows => {
         const today = new Date()
 
-        const raw_dates = rows[0]
+        const raw_dates = rows[DUE_DATE_ROW]
         let dates = []
-        for (let index = 0; index < raw_dates.length; index += 1) {
-            if (index < LAB_SKIP_COLUMNS) {
-                dates.push(undefined)
-            } else {
-                dates.push(new Date(raw_dates[index]))
-            }
+        for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LABS; index++) {
+            dates.push(new Date(raw_dates[index]))
         }
-        const headers = rows[LAB_SKIP_ROWS]
-        for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
-            if (row[0]) {   // obviously, only ping people who are on discord
-                let incomplete = []
+
+        for (let row of rows.slice(NUM_HEADERS)) {
+            if (row[DISCORD_ID_COLUMN]) {   // only ping people who have discord
                 let overdue = []
-                for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
-                    // either they're missing a lab in between, or after their last finished lab
-                    if (index < row.length && !row[index] || index >= row.length) {
+                let due_soon = []
+                for (let index = 0; index < NUM_LABS; index++) {
+                    if (!row[index + LAB_START_COLUMN]) {
                         if (today - dates[index] > 0) {
-                            overdue.push(headers[index] + ', due on ' + raw_dates[index])
-                        } else if (dates[index] - today <= 86400000 * 7) {   // if due within a week
-                            incomplete.push(headers[index] + ', due on ' + raw_dates[index])
+                            overdue.push(rows[NAME_ROW] + ', due on ' + raw_dates[index])
+                        } else if (dates[index] - today <= 86400 * 1000 * 7) {  // due within a week
+                            due_soon.push(rows[NAME_ROW] + ', due on ' + raw_dates[index])
                         }
-                        // otherwise, ignore the lab
                     }
                 }
                 const embed = new RichEmbed()
@@ -326,8 +328,8 @@ const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
                     .setDescription('**Overdue labs:**\n'
                         + ((overdue.length === 0) ? 'None!' : overdue.join('\n'))
                         + '\n\n'
-                        + '**Incomplete labs:**\n'
-                        + ((incomplete.length === 0) ? 'None!' : incomplete.join('\n')))
+                        + '**Labs due next week:**\n'
+                        + ((due_soon.length === 0) ? 'None!' : due_soon.join('\n')))
                 const user = client.users.find(user => user.tag.toLowerCase() === row[0].toLowerCase())
                 if (user) {
                     user.send(embed)
@@ -336,7 +338,7 @@ const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
                 }
             }
         }
-    }, LAB_ID)
+    }, GRADING_SHEET_ID)
 })
 
 /*** Client Triggers ***/
@@ -481,10 +483,6 @@ client.on('message', message => {
             help_poll(message.channel)
         } else if (args.length === 2 && (args[1].match(/^dice|roll$/i))) {
             help_dice(message.channel)
-        } else if (args.length === 2 && args[1].match(/^lab$/i)
-                && is_facilitator(message.member)
-                && is_management_channel(message.channel)) {
-            help_lab_facilitator(message.channel)
         } else if (args.length === 2 && args[1].match(/^role$/i)) {
             help_role(message.channel)
         } else if (args.length === 2 && args[1].match(/^q(?:ueue)?$/i)
@@ -501,130 +499,149 @@ client.on('message', message => {
                     + 'Website: `/website`\n'
                     + (is_management_channel(message.channel) ? 'Meeting Queue: `/q`\n' : '')
                     + '\n**Decal Only:**\n'
-                    + 'Lab Checkoffs: `/lab`\n'
-                    + 'Project Checkoffs: `/project`\n'
-                    + 'Attendance: `/attendance`\n')
+                    + 'Grading: `/grade`\n')
                 .setFooter('Made by Logikable#6019 for GDD :)')
             message.channel.send(embed)
         }
-    } else if (args[0].match(/^\/(?:checkoff|lab)$/i)) {
+    } else if (args[0].match(/^\/grade$/i)) {
         gapi_connect(rows => {
-            if (is_facilitator(message.member) && is_management_channel(message.channel)) {
-                if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-                    help_lab_facilitator(message.channel)
-                    return
-                }
-                if (args[1].match(/^list$/i)) {
-                    list_labs(message)
-                    return
-                }
-                const headers = rows[LAB_SKIP_ROWS]
-                if (args[1].match(/^missing$/i)) {  // check for missing at least one lab
-                    let incomplete = []
-                    for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
-                        for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
-                            if (!(index < row.length && row[index]) && row[1]) {
-                                incomplete.push(row[1])
-                                break
-                            }
-                        }
-                    }
-                    const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Students missing at least one lab:')
-                        .setColor(LIGHT_BLUE)
-                        .setDescription((incomplete.length === 0) ?
-                                '**None!** All students are done!' :
-                                incomplete.join('\n'))
-                    message.channel.send(embed)
-                    return
-                }
-                const args_str = args.slice(1).join(' ')
-                for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
-                    if (args_str.toLowerCase() === headers[index].toLowerCase()) {   // found header
-                        let incomplete = []
-                        for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
-                            if (!row[index] && row[1]) {
-                                incomplete.push(row[1] +
-                                    (row[0] ? ' [@' + row[0] + ']' : ''))
-                            }
-                        }
-                        const embed = new RichEmbed()
-                            .setTitle(':white_check_mark: Students missing ' + headers[index] + ':')
-                            .setColor(LIGHT_BLUE)
-                            .setDescription((incomplete.length === 0) ?
-                                    '**None!** All students are done!' :
-                                    incomplete.join('\n'))
-                        message.channel.send(embed)
-                        return
-                    }
-                }
-                // if not the first two cases, then check for name
-                for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
-                    if (row[1] && args_str.toLowerCase() === row[1].toLowerCase()) {
-                        let incomplete = []
-                        for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
-                            if (!(index < row.length && row[index])) {
-                                incomplete.push(headers[index])
-                            }
-                        }
-                        const embed = new RichEmbed()
-                            .setTitle(':white_check_mark: ' + row[1] + ' is missing:')
-                            .setColor(LIGHT_BLUE)
-                            .setDescription((incomplete.length === 0) ? 
-                                    'Nothing!' :
-                                    incomplete.join('\n'))
-                        message.channel.send(embed)
-                        return
-                    }
-                }
-                // if neither lab nor student was found
-                const embed = new RichEmbed()
-                    .setTitle(':exclamation: Student or lab name was not found')
-                    .setColor(RED)
-                message.channel.send(embed)
-                return
-            }
-            // default functionality for students
-            const headers = rows[LAB_SKIP_ROWS]
             const tag = message.author.tag
+            for (let row of rows.slice(NUM_HEADERS)) {
+                if (row[DISCORD_ID_COLUMN] && row[DISCORD_ID_COLUMN].toLowerCase() === tag.toLowerCase()) {
+                    // Counting how many points the student has. 70 is required to pass.
+                    let points = 0
+                    let description = ""
 
-            for (let row of rows.slice(1 + LAB_SKIP_ROWS)) {
-                if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
-                    let incomplete = []
-                    let complete = []
-                    for (let index = LAB_SKIP_COLUMNS; index < headers.length; index += 1) {
-                        if (index < row.length && row[index]) {
-                            complete.push(headers[index])
-                        } else {
-                            incomplete.push(headers[index])
+                    // Labs
+                    description += "**Labs:** [10%]\n"
+                    description += "```"
+                    let labs_completed = 0
+                    for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LABS; index++) {
+                        description += pad(rows[NAME_ROW][index] + ":", 40)
+                        if (row[index] === '') {
+                            description += "due "
+                        } else if (row[index].toLowerCase() === 'x') {
+                            labs_completed += 1;
+                            description += "P   "
+                        } else if (row[index].toLowerCase() === 'f') {
+                            description += "NP  "
                         }
+                        description += '[' + rows[DUE_DATE_ROW][index] + ']\n'
                     }
+                    description += "```"
+                    points += 100.0 * LABS_TOTAL_WEIGHT * labs_completed / NUM_LABS
+                    description += 'Labs Completed: ' + labs_completed + '/' + NUM_LABS + '\n';
+                    description += '**Lab Grade: ' + (100.0 * labs_completed / NUM_LABS).toFixed() + '%**\n\n'
+
+                    // Written Responses
+                    description += '**Written Responses:** [10%]\n'
+                    description += '```'
+                    let writings_completed = 0
+                    for (let index = WRITINGS_START_COLUMN; index < WRITINGS_START_COLUMN + NUM_WRITINGS; index++) {
+                        description += pad(rows[NAME_ROW][index] + ":", 40)
+                        if (row[index] === '') {
+                            description += "due "
+                        } else if (row[index].toLowerCase() === 'x') {
+                            writings_completed += 1;
+                            description += "P   "
+                        } else if (row[index].toLowerCase() === 'f') {
+                            description += "NP  "
+                        }
+                        description += '[' + rows[DUE_DATE_ROW][index] + ']\n'
+                    }
+                    description += '```'
+                    points += 100.0 * WRITINGS_TOTAL_WEIGHT * writings_completed / NUM_WRITINGS
+                    description += 'Written Responses Completed: ' + writings_completed + '/' + NUM_WRITINGS + '\n';
+                    description += '**Written Responses Grade: ' + (100.0 * writings_completed / NUM_WRITINGS).toFixed() + '%**\n\n'
+
+                    // Projects
+                    description += '**Projects:** [80%]\n'
+                    project_points = 0
+                    // Project 1-1
+                    description += '```'
+                    description += pad('Project 1-1 [5%]:', 30)
+                    if (row[PROJECT_ONE_PART1_COLUMN] === '') {
+                        description += "due "
+                    } else if (row[PROJECT_ONE_PART1_COLUMN].toLowerCase() === 'x') {
+                        project_points += PROJECT_ONE_PART1_WEIGHT
+                        description += "P   "
+                    } else if (row[PROJECT_ONE_PART1_COLUMN].toLowerCase() === 'f') {
+                        description += "NP  "
+                    }
+                    description += '[' + rows[DUE_DATE_ROW][PROJECT_ONE_PART1_COLUMN] + ']\n'
+                    // Project 1-2
+                    description += pad('Project 1-2 [5%]:', 30)
+                    if (row[PROJECT_ONE_PART2_COLUMN] === '') {
+                        description += "due "
+                    } else if (row[PROJECT_ONE_PART2_COLUMN].toLowerCase() === 'x') {
+                        project_points += PROJECT_ONE_PART2_WEIGHT
+                        description += "P   "
+                    } else if (row[PROJECT_ONE_PART2_COLUMN].toLowerCase() === 'f') {
+                        description += "NP  "
+                    }
+                    description += '[' + rows[DUE_DATE_ROW][PROJECT_ONE_PART2_COLUMN] + ']\n'
+                    // Project 2
+                    description += pad('Project 2 [10%]:', 30)
+                    if (row[PROJECT_TWO_COLUMN] === '') {
+                        description += "due "
+                    } else if (row[PROJECT_TWO_COLUMN].toLowerCase() === 'x') {
+                        project_points += PROJECT_TWO_WEIGHT
+                        description += "P   "
+                    } else if (row[PROJECT_TWO_COLUMN].toLowerCase() === 'f') {
+                        description += "NP  "
+                    }
+                    description += '[' + rows[DUE_DATE_ROW][PROJECT_TWO_COLUMN] + ']\n'
+                    // Project 3
+                    description += 'Project 3 [60%]:\n'
+                    description += pad('  Mentor Evaluation [24%]:', 30)
+                    if (row[PROJECT_THREE_MENTOR_EVAL_COLUMN] === '') {
+                        description += "ungraded"
+                    } else {
+                        description += row[PROJECT_THREE_MENTOR_EVAL_COLUMN] + '/' + PROJECT_THREE_MENTOR_EVAL_MAX
+                        project_points += PROJECT_THREE_MENTOR_EVAL_WEIGHT * parseInt(row[PROJECT_THREE_MENTOR_EVAL_COLUMN]) / PROJECT_THREE_MENTOR_EVAL_MAX
+                    }
+                    description += "\n"
+                    description += '  Team Evaluation [24%]: \n'
+                    description += '    Evaluation 1: hidden\n'
+                    description += '    Evaluation 2: hidden\n'
+                    description += '    Evaluation 3: hidden\n'
+                    description += pad('  Final Score [12%]:', 30)
+                    if (row[PROJECT_THREE_FINAL_SCORE_COLUMN] === '') {
+                        description += "ungraded"
+                    } else if (row[PROJECT_THREE_FINAL_SCORE_COLUMN].toLowerCase() === 'x') {
+                        project_points += PROJECT_THREE_FINAL_SCORE_WEIGHT
+                        description += "P   "
+                    } else if (row[PROJECT_THREE_FINAL_SCORE_COLUMN].toLowerCase() === 'f') {
+                        description += "NP  "
+                    }
+                    description += '```'
+                    points += 100.0 * project_points
+                    description += "**Projects Grade: " + (100.0 * project_points / PROJECTS_TOTAL_WEIGHT).toFixed() + "%**\n\n"
+
+                    // Absences
+                    const absences = row[ABSENCES_COLUMN] ? parseInt(row[ABSENCES_COLUMN]) : 0
+                    description += "Unexcused Absences: " + absences + '\n'
+                    deduction = Math.max(0, ((absences - PERMITTED_UNEXCUSED_ABSENCES) * 100.0 * UNEXCUSED_ABSENCES_DEDUCT))
+                    points -= deduction
+                    description += "Grade Deduction: " + deduction.toFixed() + "%\n"
+
+                    // Total
+                    description += "**Total Score: " + points.toFixed() + "%**\n"
+                    description += "Final Grade: " + (points >= 70 ? "P" : "NP")
+
                     const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Lab checkoff list for ' + row[1] + ':')
+                        .setTitle(':bear: GDD Decal Grading Sheet for ' + row[STUDENT_NAME_COLUMN] + ':')
                         .setColor(LIGHT_BLUE)
-                        .setDescription(
-                            'Progress: ' + complete.length + '/' + (headers.length - LAB_SKIP_COLUMNS)
-                            + '\n\n'
-                            + ((incomplete.length === 0) ?
-                                '**Congrats! You\'re all caught up.**' :
-                                '**Incomplete labs:**\n' + incomplete.join('\n'))
-                            + '\n\n'
-                            + '**Completed labs:** ' + complete.join(', '))
-                        .setFooter('Please notify a facilitator if something is wrong!')
+                        .setDescription(description)
+                        .setFooter('Please notify a facilitator if something is wrong! Note that your final grade may not be accurate until the last day.')
                     message.author.send(embed)
                     return
                 }
             }
-            // never found their username
             student_not_found(message.author)
-        }, LAB_ID)
+        }, GRADING_SHEET_ID)
     } else if (args[0].match(/^\/intro$/i)) {
         introduce_server(message.author)
-    // } else if (message.content.match(/^(?:\S+\s+)*(wes|wesley)[,.]?(?:\s+(?:\S+\s+)*)?$/i)
-    //         && is_management_channel(message.channel)) {
-    //     const wes_list = ['welsey', 'weesley', 'weasley', 'weaslely', 'weasel-y', 'weselely']
-    //     const random_wes = wes_list[Math.floor(Math.random() * wes_list.length)]
-    //     message.channel.send(':bear: Did you mean: *' + random_wes + '*? :bear:')
     } else if (args[0].match(/^\/addrole$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_role(message.channel)
@@ -645,76 +662,6 @@ client.on('message', message => {
         } else {
             help_role(message.channel)
         }
-    } else if (args[0].match(/^\/labs$/i) && is_management_channel(message.channel)) {
-        list_labs(message)
-    } else if (args[0].match(/^\/projects?$/i)) {
-        gapi_connect(rows => {
-            const headers = rows[0]
-            const tag = message.author.tag
-
-            for (let row of rows.slice(1)) {
-                if (row[0] && tag.toLowerCase() === row[0].toLowerCase()) {   // found their username!
-                    let grades = []
-                    for (let index = PROJECT_SKIP_COLUMNS; index < headers.length; index += 1) {
-                        if (index < row.length) {
-                            grades.push('**' + headers[index] + '**: ' + row[index])
-                        } else {
-                            grades.push('**' + headers[index] + '**:')
-                        }
-                    }
-                    const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Project checkoff list for ' + row[1] + ':')
-                        .setColor(LIGHT_BLUE)
-                        .setDescription(grades.join('\n'))
-                        .setFooter('Please notify a facilitator if something is wrong!')
-                    message.author.send(embed)
-                    return
-                }
-            }
-            // never found their username
-            student_not_found(message.author)
-        }, PROJECT_ID)
-    } else if (args[0].match(/^\/attend(?:ance)?$/i)) {
-        gapi_connect(rows => {
-            const headers = rows[4]
-            const tag = message.author.tag
-
-            for (let row of rows.slice(5)) {
-                if (row[2] && tag.toLowerCase() === row[2].toLowerCase()) {    // found their username!
-                    let present = 0
-                    let unexcused = 0
-                    let excused = 0
-                    for (let index = ATTENDANCE_SKIP_COLUMNS;
-                            index < ATTENDANCE_SKIP_COLUMNS + DECAL_MEETINGS;
-                            index += 1) {
-                        if (index < row.length) {
-                            if (row[index].match(/^X$/i)) {
-                                present += 1
-                            } else if (row[index].match(/^U$/i)) {
-                                unexcused += 1
-                            } else if (row[index].match(/^E$/i)) {
-                                excused += 1
-                            }
-                        }
-                    }
-                    const embed = new RichEmbed()
-                        .setTitle(':white_check_mark: Decal attendance for ' + row[0] + ':')
-                        .setColor(LIGHT_BLUE)
-                        .setDescription('Present: ' + present + '\n'
-                            + 'Excused: ' + excused + '\n'
-                            + 'Unexcused: ' + unexcused
-                            + ((unexcused >= 2) ?
-                                '\n\n**Warning:** You have already used both of your unexcused absences! '
-                                    + 'Missing future classes may affect your grade.'
-                                : ''))
-                        .setFooter('Please notify a facilitator if something is wrong!')
-                    message.author.send(embed)
-                    return
-                }
-            }
-            // never found their username
-            student_not_found(message.author)
-        }, ATTENDANCE_ID)
     } else if (args[0].match(/^\/suggest(?:ion)?$/i) && args.length > 1) {
         const args_str = message.content.substring(args[0].length + 1)
         const suggestion = new RichEmbed()
@@ -824,12 +771,6 @@ client.on('message', message => {
             message.channel.send(embed)
             return
         }
-    } else if (args[0].match(/^\/trello$/i)) {
-        const embed = new RichEmbed()
-            .setTitle(':bear: Trello link:')
-            .setColor(LIGHT_BLUE)
-            .setDescription('https://trello.com/gddfamspring2019')
-        message.channel.send(embed)        
     } else if (args[0].match(/^\/kill$/i)
             && is_admin(message.author)) {
         if (args.length === 1) {
