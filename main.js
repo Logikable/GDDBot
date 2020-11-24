@@ -57,29 +57,29 @@ const NAME_ROW = 2
 const DUE_DATE_ROW = 3
 // Labs
 const LAB_START_COLUMN = 3
-const NUM_LABS = 6
+const NUM_LABS = 8
 const LABS_TOTAL_WEIGHT = 0.1
 // Written Responses
-const WRITINGS_START_COLUMN = 20
+const WRITINGS_START_COLUMN = 22
 const NUM_WRITINGS = 8
 const WRITINGS_TOTAL_WEIGHT = 0.1
 // Projects
-const PROJECT_ONE_PART1_COLUMN = 10
+const PROJECT_ONE_PART1_COLUMN = 12
 const PROJECT_ONE_PART1_WEIGHT = 0.05
-const PROJECT_ONE_PART2_COLUMN = 11
+const PROJECT_ONE_PART2_COLUMN = 13
 const PROJECT_ONE_PART2_WEIGHT = 0.05
-const PROJECT_TWO_COLUMN = 12
+const PROJECT_TWO_COLUMN = 14
 const PROJECT_TWO_WEIGHT = 0.1
-const PROJECT_THREE_MENTOR_EVAL_COLUMN = 13
+const PROJECT_THREE_MENTOR_EVAL_COLUMN = 15
 const PROJECT_THREE_MENTOR_EVAL_WEIGHT = 0.6 * 0.4
 const PROJECT_THREE_MENTOR_EVAL_MAX = 4
-const PROJECT_THREE_TEAM_EVAL_START_COLUMN = 14
+const PROJECT_THREE_TEAM_EVAL_START_COLUMN = 16
 const PROJECT_THREE_NUM_TEAM_EVALS = 3
-const PROJECT_THREE_FINAL_SCORE_COLUMN = 17
+const PROJECT_THREE_FINAL_SCORE_COLUMN = 19
 const PROJECT_THREE_FINAL_SCORE_WEIGHT = 0.6 * 0.2
 const PROJECTS_TOTAL_WEIGHT = 0.8
 // Attendance
-const ABSENCES_COLUMN = 30
+const ABSENCES_COLUMN = 32
 const PERMITTED_UNEXCUSED_ABSENCES = 2
 const UNEXCUSED_ABSENCES_DEDUCT = 0.1
 
@@ -507,16 +507,23 @@ client.on('message', message => {
     } else if (args[0].match(/^\/grade$/i)) {
         gapi_connect(rows => {
             const tag = message.author.tag
+
+            // Search through rows of the spreadhseet
             for (let row of rows.slice(NUM_HEADERS)) {
+
+                // If this row belongs to the author of the message:
                 if (row[DISCORD_ID_COLUMN] && row[DISCORD_ID_COLUMN].toLowerCase() === tag.toLowerCase()) {
                     // Counting how many points the student has. 70 is required to pass.
                     let points = 0
                     let description = ""
 
                     // Labs
+                    // Labs heading
                     description += "**Labs:** [10%]\n"
                     description += "```"
                     let labs_completed = 0
+
+                    // Iterate through labs
                     for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LABS; index++) {
                         description += pad(rows[NAME_ROW][index] + ":", 40)
                         if (row[index] === '') {
