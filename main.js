@@ -37,7 +37,7 @@ const RED = 0xFF0000
 const GUILD_IDS = ['433080296057864192',    // official GDD server
     '317420684689276928',   // testing server
 ]
-const ADMIN_IDS = ['313850299838365698',    // sean
+const ADMIN_IDS = ['249014951295975429',   // matthew
 ]
 const SUGG_RECIP_USER_IDS = ['234520560355246080',  // imon
     '249014951295975429',   // matthew
@@ -47,7 +47,8 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD manageme
 ]
 
 // Decal grading spreadsheet
-const GRADING_SHEET_ID = '1A_I53ZFz5kdv9vGtfBDI3cVSufHuRtwcvZXh9u64Z74'
+const GRADING_SHEET_ID = '1CbRcwa-OHI0Xh8AQ5ujzQslshJPJ7w0HGNkxWO3iC_g'
+
 // All row/column numbers are 0 indexed.
 const NUM_HEADERS = 4
 const DISCORD_ID_COLUMN = 0
