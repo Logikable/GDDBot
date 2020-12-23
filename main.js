@@ -24,7 +24,7 @@ const schedule = require('node-schedule')
 // google api
 const TOKEN_PATH = 'gapi_token.json'
 // discord
-const token = fs.readFileSync('token').toString()
+const token = fs.readFileSync('token').toString().replace(/(\r\n|\n|\r)/gm, "");
 const client = new Client()
 
 // constants
