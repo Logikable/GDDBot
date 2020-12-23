@@ -57,7 +57,8 @@ const NAME_ROW = 2
 const DUE_DATE_ROW = 3
 // Labs
 const LAB_START_COLUMN = 3
-const NUM_LABS = 8
+const NUM_LABS = 7
+const NUM_LAB_COLUMNS = 8
 const LABS_TOTAL_WEIGHT = 0.1
 // Written Responses
 const WRITINGS_START_COLUMN = 22
@@ -524,7 +525,7 @@ client.on('message', message => {
                     let labs_completed = 0
 
                     // Iterate through labs
-                    for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LABS; index++) {
+                    for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LAB_COLUMNS; index++) {
                         description += pad(rows[NAME_ROW][index] + ":", 40)
                         if (row[index] === '') {
                             description += "due "
