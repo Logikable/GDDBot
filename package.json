@@ -1,3 +1,4 @@
 {
-    "name": "gdd-bot"
+    "name": "gdd-bot",
+    "main": "main.js"
 }
