@@ -1,5 +1,4 @@
 gapi_credentials.json
 gapi_token.json
-node_modules/
 package-lock.json
 token
