@@ -4,6 +4,10 @@
     "dependencies": {
         "discord.js": "12.5.1",
         "system-sleep": "1.3.7",
-        "googleapis": "66.0.0"
+        "googleapis": "66.0.0",
+        "async-limiter": "1.0.1",
+        "long": "4.0.0",
+        "node-scheduler": "1.3.2",
+        "snekfetch": "3.6.4"
     }
 }
