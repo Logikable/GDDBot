@@ -12,6 +12,9 @@ TODO:
 Documentation README
 */
 
+// testing
+console.log("Running main.js")
+
 /*** Global Variables ***/
 
 // reqs
@@ -21,11 +24,18 @@ const { Client, DMChannel, MessageEmbed, MessageMentions } = require('discord.js
 const { google } = require('googleapis')
 const schedule = require('node-schedule')
 
-// google api
-const TOKEN_PATH = 'gapi_token.json'
-// discord
-const token = fs.readFileSync('token').toString().replace(/(\r\n|\n|\r)/gm, "");
+// // google api
+// const TOKEN_PATH = 'gapi_token.json'
+// // discord
+// const token = fs.readFileSync('token').toString().replace(/(\r\n|\n|\r)/gm, "");
+
+// Initialize Discord client
 const client = new Client()
+
+// // discord token
+// const token = process.env.DJS_TOKEN
+
+// google
 
 // constants
 const NUM_EMOJIS = [':zero:', ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:', ':nine:']
@@ -112,12 +122,26 @@ function is_management_channel(channel) {
 
 function gapi_connect(callback, spreadsheet_id) {
     // initialize google api oAuth2 client
-    fs.readFile('gapi_credentials.json', (err, content) => {
-        const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
-        const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
-        fs.readFile(TOKEN_PATH, (err, token) => {
-            oAuth2Client.setCredentials(JSON.parse(token))
-            const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
+    // fs.readFile('gapi_credentials.json', (err, content) => {
+    //     const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
+    //     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
+    //     fs.readFile(TOKEN_PATH, (err, token) => {
+    //         oAuth2Client.setCredentials(JSON.parse(token))
+    //         const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
+    //         sheets.spreadsheets.values.get({
+    //             spreadsheetId: spreadsheet_id,
+    //             range: 'Sheet1!A:ZZ',
+    //         }, (err, res) => {
+    //             if (err) return console.log('API Error: ' + err)
+    //             const rows = res.data.values
+    //             callback(rows)
+    //         })
+    //     })
+    // })
+    const { client_secret, client_id, redirect_uris } = JSON.parse(process.env.GAPI_CREDENTIALS).installed
+    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
+    oAuth2Client.setCredentials(JSON.parse(process.env.GAPI_TOKEN))
+    const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
             sheets.spreadsheets.values.get({
                 spreadsheetId: spreadsheet_id,
                 range: 'Sheet1!A:ZZ',
@@ -126,8 +150,6 @@ function gapi_connect(callback, spreadsheet_id) {
                 const rows = res.data.values
                 callback(rows)
             })
-        })
-    })
 }
 
 // returns a role, returning null if not found
@@ -835,4 +857,4 @@ client.on('error', e => console.error(e))
 client.on('warn', e => console.warn(e))
 // client.on('debug', e => console.info(e))
 
-client.login(token)
+client.login(process.env.DJS_TOKEN)
