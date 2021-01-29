@@ -7,7 +7,7 @@
         "googleapis": "66.0.0",
         "async-limiter": "1.0.1",
         "long": "4.0.0",
-        "node-scheduler": "1.3.2",
+        "node-schedule": "1.3.2",
         "snekfetch": "3.6.4"
     }
 }
