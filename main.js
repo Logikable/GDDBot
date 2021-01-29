@@ -138,6 +138,9 @@ function gapi_connect(callback, spreadsheet_id) {
     //         })
     //     })
     // })
+    console.log("gapi_connect starting")
+    console.log(process.env.GAPI_CREDENTIALS)
+    console.log(process.env.GAPI_TOKEN)
     const { client_secret, client_id, redirect_uris } = JSON.parse(process.env.GAPI_CREDENTIALS).installed
     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
     oAuth2Client.setCredentials(JSON.parse(process.env.GAPI_TOKEN))
