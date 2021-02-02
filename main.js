@@ -57,7 +57,7 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD manageme
 ]
 
 // Decal grading spreadsheet
-const GRADING_SHEET_ID = '1CbRcwa-OHI0Xh8AQ5ujzQslshJPJ7w0HGNkxWO3iC_g'
+const GRADING_SHEET_ID = '1_IsFEBELB-I2-VHFhNxi902_0ps_Uj6Fsf4DlM4aAgw'
 
 // All row/column numbers are 0 indexed.
 const NUM_HEADERS = 4
