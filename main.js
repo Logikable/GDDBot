@@ -37,7 +37,7 @@ const RED = 0xFF0000
 const GUILD_IDS = ['433080296057864192',    // official GDD server
     '317420684689276928',   // testing server
 ]
-const ADMIN_IDS = ['313850299838365698',    // sean
+const ADMIN_IDS = ['249014951295975429',   // matthew
 ]
 const SUGG_RECIP_USER_IDS = ['234520560355246080',  // imon
     '249014951295975429',   // matthew
@@ -47,7 +47,8 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD manageme
 ]
 
 // Decal grading spreadsheet
-const GRADING_SHEET_ID = '1A_I53ZFz5kdv9vGtfBDI3cVSufHuRtwcvZXh9u64Z74'
+const GRADING_SHEET_ID = '1CbRcwa-OHI0Xh8AQ5ujzQslshJPJ7w0HGNkxWO3iC_g'
+
 // All row/column numbers are 0 indexed.
 const NUM_HEADERS = 4
 const DISCORD_ID_COLUMN = 0
@@ -56,29 +57,30 @@ const NAME_ROW = 2
 const DUE_DATE_ROW = 3
 // Labs
 const LAB_START_COLUMN = 3
-const NUM_LABS = 6
+const NUM_LABS = 7
+const NUM_LAB_COLUMNS = 8
 const LABS_TOTAL_WEIGHT = 0.1
 // Written Responses
-const WRITINGS_START_COLUMN = 20
+const WRITINGS_START_COLUMN = 22
 const NUM_WRITINGS = 8
 const WRITINGS_TOTAL_WEIGHT = 0.1
 // Projects
-const PROJECT_ONE_PART1_COLUMN = 10
+const PROJECT_ONE_PART1_COLUMN = 12
 const PROJECT_ONE_PART1_WEIGHT = 0.05
-const PROJECT_ONE_PART2_COLUMN = 11
+const PROJECT_ONE_PART2_COLUMN = 13
 const PROJECT_ONE_PART2_WEIGHT = 0.05
-const PROJECT_TWO_COLUMN = 12
+const PROJECT_TWO_COLUMN = 14
 const PROJECT_TWO_WEIGHT = 0.1
-const PROJECT_THREE_MENTOR_EVAL_COLUMN = 13
+const PROJECT_THREE_MENTOR_EVAL_COLUMN = 15
 const PROJECT_THREE_MENTOR_EVAL_WEIGHT = 0.6 * 0.4
 const PROJECT_THREE_MENTOR_EVAL_MAX = 4
-const PROJECT_THREE_TEAM_EVAL_START_COLUMN = 14
+const PROJECT_THREE_TEAM_EVAL_START_COLUMN = 16
 const PROJECT_THREE_NUM_TEAM_EVALS = 3
-const PROJECT_THREE_FINAL_SCORE_COLUMN = 17
+const PROJECT_THREE_FINAL_SCORE_COLUMN = 19
 const PROJECT_THREE_FINAL_SCORE_WEIGHT = 0.6 * 0.2
 const PROJECTS_TOTAL_WEIGHT = 0.8
 // Attendance
-const ABSENCES_COLUMN = 30
+const ABSENCES_COLUMN = 32
 const PERMITTED_UNEXCUSED_ABSENCES = 2
 const UNEXCUSED_ABSENCES_DEDUCT = 0.1
 
@@ -506,17 +508,24 @@ client.on('message', message => {
     } else if (args[0].match(/^\/grade$/i)) {
         gapi_connect(rows => {
             const tag = message.author.tag
+
+            // Search through rows of the spreadhseet
             for (let row of rows.slice(NUM_HEADERS)) {
+
+                // If this row belongs to the author of the message:
                 if (row[DISCORD_ID_COLUMN] && row[DISCORD_ID_COLUMN].toLowerCase() === tag.toLowerCase()) {
                     // Counting how many points the student has. 70 is required to pass.
                     let points = 0
                     let description = ""
 
                     // Labs
+                    // Labs heading
                     description += "**Labs:** [10%]\n"
                     description += "```"
                     let labs_completed = 0
-                    for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LABS; index++) {
+
+                    // Iterate through labs
+                    for (let index = LAB_START_COLUMN; index < LAB_START_COLUMN + NUM_LAB_COLUMNS; index++) {
                         description += pad(rows[NAME_ROW][index] + ":", 40)
                         if (row[index] === '') {
                             description += "due "
