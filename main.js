@@ -12,20 +12,30 @@ TODO:
 Documentation README
 */
 
+// testing
+console.log("Running main.js")
+
 /*** Global Variables ***/
 
 // reqs
 const fs = require('fs')
 const sleep = require('system-sleep')
-const { Client, DMChannel, RichEmbed } = require('discord.js')
+const { Client, DMChannel, MessageEmbed, MessageMentions } = require('discord.js')
 const { google } = require('googleapis')
 const schedule = require('node-schedule')
 
-// google api
-const TOKEN_PATH = 'gapi_token.json'
-// discord
-const token = fs.readFileSync('token').toString()
+// // google api
+// const TOKEN_PATH = 'gapi_token.json'
+// // discord
+// const token = fs.readFileSync('token').toString().replace(/(\r\n|\n|\r)/gm, "");
+
+// Initialize Discord client
 const client = new Client()
+
+// // discord token
+// const token = process.env.DJS_TOKEN
+
+// google
 
 // constants
 const NUM_EMOJIS = [':zero:', ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:', ':nine:']
@@ -47,7 +57,7 @@ const MANAGEMENT_CATEGORY_IDS = ['433105370962198530',  // official GDD manageme
 ]
 
 // Decal grading spreadsheet
-const GRADING_SHEET_ID = '1CbRcwa-OHI0Xh8AQ5ujzQslshJPJ7w0HGNkxWO3iC_g'
+const GRADING_SHEET_ID = '1_IsFEBELB-I2-VHFhNxi902_0ps_Uj6Fsf4DlM4aAgw'
 
 // All row/column numbers are 0 indexed.
 const NUM_HEADERS = 4
@@ -112,12 +122,29 @@ function is_management_channel(channel) {
 
 function gapi_connect(callback, spreadsheet_id) {
     // initialize google api oAuth2 client
-    fs.readFile('gapi_credentials.json', (err, content) => {
-        const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
-        const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
-        fs.readFile(TOKEN_PATH, (err, token) => {
-            oAuth2Client.setCredentials(JSON.parse(token))
-            const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
+    // fs.readFile('gapi_credentials.json', (err, content) => {
+    //     const { client_secret, client_id, redirect_uris } = JSON.parse(content).installed
+    //     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
+    //     fs.readFile(TOKEN_PATH, (err, token) => {
+    //         oAuth2Client.setCredentials(JSON.parse(token))
+    //         const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
+    //         sheets.spreadsheets.values.get({
+    //             spreadsheetId: spreadsheet_id,
+    //             range: 'Sheet1!A:ZZ',
+    //         }, (err, res) => {
+    //             if (err) return console.log('API Error: ' + err)
+    //             const rows = res.data.values
+    //             callback(rows)
+    //         })
+    //     })
+    // })
+    console.log("gapi_connect starting")
+    console.log(process.env.GAPI_CREDENTIALS)
+    console.log(process.env.GAPI_TOKEN)
+    const { client_secret, client_id, redirect_uris } = JSON.parse(process.env.GAPI_CREDENTIALS).installed
+    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0])
+    oAuth2Client.setCredentials(JSON.parse(process.env.GAPI_TOKEN))
+    const sheets = google.sheets({ version: 'v4', auth: oAuth2Client })
             sheets.spreadsheets.values.get({
                 spreadsheetId: spreadsheet_id,
                 range: 'Sheet1!A:ZZ',
@@ -126,21 +153,27 @@ function gapi_connect(callback, spreadsheet_id) {
                 const rows = res.data.values
                 callback(rows)
             })
-        })
-    })
 }
 
 // returns a role, returning null if not found
 function parse_role(message, args) {
     const args_str = args.join(' ')
     if (args_str.match(/^league(?:\s*of\s*legends?)?|lol$/i)) {
-        return message.guild.roles.find("name", "League of Legends")
+        return message.guild.roles.cache.find(r => r.name === 'League of Legends')
     } else if (args_str.match(/^overwatch|ow$/i)) {
-        return message.guild.roles.find("name", "Overwatch")
+        return message.guild.roles.cache.find(r => r.name === 'Overwatch')
     } else if (args_str.match(/^climb(?:ing)?$/i)) {
-        return message.guild.roles.find("name", "Climbing")
+        return message.guild.roles.cache.find(r => r.name === 'Climbing')
     } else if (args_str.match(/^m(?:ine)?c(?:raft)?$/i)) {
-        return message.guild.roles.find("name", "Minecraft")
+        return message.guild.roles.cache.find(r => r.name === 'Minecraft')
+    } else if (args_str.match(/artist/i)) {
+        return message.guild.roles.cache.find(r => r.name === 'Artist')
+    } else if (args_str.match(/musician/i)) {
+        return message.guild.roles.cache.find(r => r.name === 'Musician')
+    } else if (args_str.match(/programmer/i)) {
+        return message.guild.roles.cache.find(r => r.name === 'Programmer')
+    } else if (args_str.match(/design/i)) {
+        return message.guild.roles.cache.find(r => r.name === 'Design')
     }
     return null
 }
@@ -155,7 +188,7 @@ function pad(str, n) {
 /*** Help Functions ***/
 
 function help_poll(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':bar_chart: /poll usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('Yes / No: `/poll "Boba?"`\n'
@@ -164,7 +197,7 @@ function help_poll(channel) {
 }
 
 function help_dice(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':game_die: /dice usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('Roll a 6 sided dice: `/dice`\n'
@@ -173,17 +206,33 @@ function help_dice(channel) {
     channel.send(embed)
 }
 
-function help_role(channel) {
-    const embed = new RichEmbed()
-        .setTitle(':question: /role usage:')
+// function help_role(channel) {
+//     const embed = new MessageEmbed()
+//         .setTitle(':question: /role usage:')
+//         .setColor(LIGHT_BLUE)
+//         .setDescription('Adding a role: `/role add <game>` `/addrole <name>`\n'
+//             + 'Removing a role: `/role remove <name>` `/removerole <name>`')
+//     channel.send(embed)
+// }
+
+function help_addrole(channel) {
+    const embed = new MessageEmbed()
+        .setTitle(':question: /addrole usage:')
         .setColor(LIGHT_BLUE)
-        .setDescription('Adding a role: `/role add <game>` `/addrole <name>`\n'
-            + 'Removing a role: `/role remove <name>` `/removerole <name>`')
+        .setDescription('Adding a role: `/role add <rolename>`')
+    channel.send(embed)
+}
+
+function help_removerole(channel) {
+    const embed = new MessageEmbed()
+        .setTitle(':question: /removerole usage:')
+        .setColor(LIGHT_BLUE)
+        .setDescription('Removing a role: `/role remove <rolename>`')
     channel.send(embed)
 }
 
 function help_queue(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':busts_in_silhouette: /q usage:')
         .setColor(LIGHT_BLUE)
         .setDescription('Join the queue: `/q join`\n'
@@ -201,7 +250,7 @@ function introduce_server(user) {
         + 'If you\'re interested in making games, this is the place for you. We look forward to working with you :smile:\n\n'
         + 'Please read #welcome-and-rules and #apply-for-role.'
 
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':game_die: Welcome to GDD! :bear:')
         .setColor(LIGHT_BLUE)
         .setDescription(msg)
@@ -209,7 +258,7 @@ function introduce_server(user) {
 }
 
 function can_only_be_used_in_guild(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':exclamation: Command error:')
         .setColor(RED)
         .setDescription('Sorry, that command can only be used in the GDD server')
@@ -218,21 +267,21 @@ function can_only_be_used_in_guild(channel) {
 
 // notifies the channel
 function role_not_found(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':exclamation: That role couldn\'t be found')
         .setColor(RED)
     channel.send(embed)
 }
 
 function turn_off_invisible(channel) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':exclamation: Set your status away from `invisible` to use this command')
         .setColor(RED)
     channel.send(embed)
 }
 
 function student_not_found(author) {
-    const embed = new RichEmbed()
+    const embed = new MessageEmbed()
         .setTitle(':exclamation: Command error:')
         .setColor(RED)
         .setDescription('This command is for people currently in the decal. '
@@ -240,7 +289,7 @@ function student_not_found(author) {
     author.send(embed)
 }
 
-function add_role(message, args) {
+async function add_role(message, args) {
     if (!message.guild || !GUILD_IDS.includes(message.guild.id)) {
         can_only_be_used_in_guild(message.channel)
         return
@@ -254,21 +303,23 @@ function add_role(message, args) {
         turn_off_invisible(message.channel)
         return
     }
-    if (message.member.roles.has(role.id)) {
-        const embed = new RichEmbed()
+    if (message.member.roles.cache.has(role.id)) {
+        const embed = new MessageEmbed()
             .setTitle(':exclamation: You already have that role')
             .setColor(RED)
         message.channel.send(embed)
         return
     }
-    message.member.addRole(role)
-    const embed = new RichEmbed()
+    await message.member.roles.add([role])
+        .then(console.log)
+        .catch(console.error)
+    const embed = new MessageEmbed()
         .setTitle(':white_check_mark: Role added')
         .setColor(LIGHT_BLUE)
     message.channel.send(embed)
 }
 
-function remove_role(message, args) {
+async function remove_role(message, args) {
     if (!message.guild || !GUILD_IDS.includes(message.guild.id)) {
         can_only_be_used_in_guild(message.channel)
         return
@@ -282,15 +333,17 @@ function remove_role(message, args) {
         turn_off_invisible(message.channel)
         return
     }
-    if (!message.member.roles.has(role.id)) {
-        const embed = new RichEmbed()
+    if (!message.member.roles.cache.has(role.id)) {
+        const embed = new MessageEmbed()
             .setTitle(':exclamation: You don\'t have that role')
             .setColor(RED)
         message.channel.send(embed)
         return
     }
-    message.member.removeRole(role)
-    const embed = new RichEmbed()
+    await message.member.roles.remove([role])
+        .then(console.log)
+        .catch(console.error)
+    const embed = new MessageEmbed()
         .setTitle(':white_check_mark: Role removed')
         .setColor(LIGHT_BLUE)
     message.channel.send(embed)
@@ -324,7 +377,7 @@ const lab_reminder_cron = schedule.scheduleJob('0 12 * * 6', () => {
                         }
                     }
                 }
-                const embed = new RichEmbed()
+                const embed = new MessageEmbed()
                     .setTitle(':white_check_mark: Lab checkoff reminders!')
                     .setColor(LIGHT_BLUE)
                     .setDescription('**Overdue labs:**\n'
@@ -369,7 +422,7 @@ client.on('message', message => {
 
         console.log(date + content)
         for (let admin_id of ADMIN_IDS) {
-            client.fetchUser(admin_id).then(user => {
+            client.users.fetch(admin_id).then(user => {
                 user.send(content)
             }).catch(e => console.log(e))
         }
@@ -378,18 +431,18 @@ client.on('message', message => {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
             help_poll(message.channel)
         } else if (args.length > 12) {
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':exclamation: Too many answers - max 10')
                 .setColor(RED)
             message.channel.send(embed)
         } else if (args[1].length > 200) {
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':exclamation: Question too long, 200 characters maximum')
                 .setColor(RED)
             message.channel.send(embed)
         } else if (args.length === 2) {
             const query = args[1]
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':bar_chart: ' + query)
                 .setColor(LIGHT_BLUE)
                 .setDescription(':white_check_mark: Yes\n:negative_squared_cross_mark: No')
@@ -408,7 +461,7 @@ client.on('message', message => {
                 i += 1
             }
 
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':bar_chart: ' + query)
                 .setColor(LIGHT_BLUE)
                 .setDescription(options_str)
@@ -440,7 +493,7 @@ client.on('message', message => {
                     }
                     faces = parseInt(matches[2])
                 } else {
-                    const embed = new RichEmbed()
+                    const embed = new MessageEmbed()
                         .setTitle(':exclamation: Please enter a valid number of faces and dice')
                         .setColor(RED)
                     message.channel.send(embed)
@@ -448,14 +501,14 @@ client.on('message', message => {
                 }
 
                 if (dice > 100) {
-                    const embed = new RichEmbed()
+                    const embed = new MessageEmbed()
                         .setTitle(':exclamation: Please use fewer than 100 dice')
                         .setColor(RED)
                     message.channel.send(embed)
                     return
                 }
                 if (faces >= 1e18) {
-                    const embed = new RichEmbed()
+                    const embed = new MessageEmbed()
                         .setTitle(':exclamation: Please use fewer than 1 quintillion faces')
                         .setColor(RED)
                     message.channel.send(embed)
@@ -472,7 +525,7 @@ client.on('message', message => {
                 }
                 results.push(result)
             }
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':game_die: Rolling '
                     + ((dice == 1) ? 'a' : dice) + ' '
                     + faces + '-sided dice:')
@@ -485,18 +538,21 @@ client.on('message', message => {
             help_poll(message.channel)
         } else if (args.length === 2 && (args[1].match(/^dice|roll$/i))) {
             help_dice(message.channel)
-        } else if (args.length === 2 && args[1].match(/^role$/i)) {
-            help_role(message.channel)
+        } else if (args.length === 2 && args[1].match(/^addrole$/i)) {
+                help_addrole(message.channel)
+        } else if (args.length === 2 && args[1].match(/^removerole$/i)) {
+                    help_removerole(message.channel)
         } else if (args.length === 2 && args[1].match(/^q(?:ueue)?$/i)
                 && is_management_channel(message.channel)) {
             help_queue(message.channel)
         } else {
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':question: GDDBot Commands:')
                 .setColor(LIGHT_BLUE)
                 .setDescription('Roll a dice: `/roll`\n'
                     + 'Poll the channel: `/poll`\n'
-                    + 'Add/Remove Role: `/role`\n'
+                    + 'Add Role: `/addrole`\n'
+                    + 'Remove Role: `/removerole`\n'
                     + 'Suggest a Resource: `/suggest <suggestion>`\n'
                     + 'Website: `/website`\n'
                     + (is_management_channel(message.channel) ? 'Meeting Queue: `/q`\n' : '')
@@ -638,7 +694,7 @@ client.on('message', message => {
                     description += "**Total Score: " + points.toFixed() + "%**\n"
                     description += "Final Grade: " + (points >= 70 ? "P" : "NP")
 
-                    const embed = new RichEmbed()
+                    const embed = new MessageEmbed()
                         .setTitle(':bear: GDD Decal Grading Sheet for ' + row[STUDENT_NAME_COLUMN] + ':')
                         .setColor(LIGHT_BLUE)
                         .setDescription(description)
@@ -653,27 +709,27 @@ client.on('message', message => {
         introduce_server(message.author)
     } else if (args[0].match(/^\/addrole$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-            help_role(message.channel)
+            help_addrole(message.channel)
         } else {
             add_role(message, args.slice(1))
         }
     } else if (args[0].match(/^\/(?:remove|delete)role$/i)) {
         if (args.length === 1 || (args.length === 2 && args[1].match(/^help$/i))) {
-            help_role(message.channel)
+            help_removerole(message.channel)
         } else {
             remove_role(message, args.slice(1))
         }
-    } else if (args[0].match(/^\/role$/i)) {
-        if (args.length >= 3 && args[1].match(/^add$/i)) {
-            add_role(message, args.slice(2))
-        } else if (args.length >= 3 && (args[1].match(/^remove|delete$/i))) {
-            remove_role(message, args.slice(2))
-        } else {
-            help_role(message.channel)
-        }
+    // } else if (args[0].match(/^\/role$/i)) {
+    //     if (args.length >= 3 && args[1].match(/^add$/i)) {
+    //         add_role(message, args.slice(2))
+    //     } else if (args.length >= 3 && (args[1].match(/^remove|delete$/i))) {
+    //         remove_role(message, args.slice(2))
+    //     } else {
+    //         help_role(message.channel)
+    //     }
     } else if (args[0].match(/^\/suggest(?:ion)?$/i) && args.length > 1) {
         const args_str = message.content.substring(args[0].length + 1)
-        const suggestion = new RichEmbed()
+        const suggestion = new MessageEmbed()
             .setTitle(':bear: This just in!')
             .setColor(LIGHT_BLUE)
             .setDescription('From '
@@ -684,7 +740,7 @@ client.on('message', message => {
         }
 
         // give the user a response
-        const embed = new RichEmbed()
+        const embed = new MessageEmbed()
             .setTitle(':bear: Thanks for the suggestion!')
             .setColor(LIGHT_BLUE)
             .setDescription('Your suggestion has been forwarded.')
@@ -694,13 +750,13 @@ client.on('message', message => {
         const id = args[1]
         client.users.find('id', id).send(args_str)
     } else if (args[0].match(/^\/git(?:hub)?$/i)) {
-        const embed = new RichEmbed()
+        const embed = new MessageEmbed()
             .setTitle(':bear: GDDBot Github link:')
             .setColor(LIGHT_BLUE)
             .setDescription('https://github.com/logikable/GDDBot')
         message.channel.send(embed)
     } else if (args[0].match(/^\/web(?:site)?$/i)) {
-        const embed = new RichEmbed()
+        const embed = new MessageEmbed()
             .setTitle(':bear: GDD website link:')
             .setColor(LIGHT_BLUE)
             .setDescription('https://gamedesign.berkeley.edu/')
@@ -713,19 +769,19 @@ client.on('message', message => {
         }
         if (args[1].match(/^j(?:oin)?$/i)) {
             queue.push(message.member.displayName)
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':busts_in_silhouette: Queue joined')
                 .setColor(LIGHT_BLUE)
             message.channel.send(embed)
         } else if (args[1].match(/^n(?:ext)?$/i)) {
             if (queue.length === 0) {
-                const embed = new RichEmbed()
+                const embed = new MessageEmbed()
                     .setTitle(':exclamation: Queue empty')
                     .setColor(RED)
                 message.channel.send(embed)
             } else {
                 const next = queue.shift()
-                const embed = new RichEmbed()
+                const embed = new MessageEmbed()
                     .setTitle(':busts_in_silhouette: Now speaking:')
                     .setColor(LIGHT_BLUE)
                     .setDescription(next)
@@ -736,7 +792,7 @@ client.on('message', message => {
             for (let i = 0; i < queue.length; i += 1) {
                 list.push((i + 1) + '. ' + queue[i])
             }
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':busts_in_silhouette: Speaker order:')
                 .setColor(LIGHT_BLUE)
                 .setDescription((list.length === 0) ? 'Queue is empty!'
@@ -744,7 +800,7 @@ client.on('message', message => {
             message.channel.send(embed)
         } else if (args[1].match(/^c(?:lear)?$/i)) {
             queue = []
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':busts_in_silhouette: Queue cleared')
                 .setColor(LIGHT_BLUE)
             message.channel.send(embed)
@@ -755,7 +811,7 @@ client.on('message', message => {
             } else {
                 let matches = args[2].match(/^([1-9][0-9]*)$/i)
                 if (!matches) {
-                    const embed = new RichEmbed()
+                    const embed = new MessageEmbed()
                         .setTitle(':exclamation: Invalid position in queue.')
                         .setColor(RED)
                     message.channel.send(embed)
@@ -765,7 +821,7 @@ client.on('message', message => {
                 remove_index = parseInt(matches[0]) - 1
             }
             if (remove_index >= queue.length) {
-                const embed = new RichEmbed()
+                const embed = new MessageEmbed()
                     .setTitle(':exclamation: There are '
                         + (queue.length === 0 ? 'no speakers' : 'only ' + queue.length + ' speaker(s)')
                         + ' in queue')
@@ -774,7 +830,7 @@ client.on('message', message => {
                 return
             }
             queue.splice(remove_index, 1)
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':busts_in_silhouette: Speaker removed')
                 .setColor(LIGHT_BLUE)
             message.channel.send(embed)
@@ -787,7 +843,7 @@ client.on('message', message => {
         }
         if (args[1].match(/^lab_reminders$/i)) {
             lab_reminder_cron.cancel()
-            const embed = new RichEmbed()
+            const embed = new MessageEmbed()
                 .setTitle(':skull_crossbones: Cron killed')
                 .setColor(RED)
             message.channel.send(embed)
@@ -804,4 +860,4 @@ client.on('error', e => console.error(e))
 client.on('warn', e => console.warn(e))
 // client.on('debug', e => console.info(e))
 
-client.login(token)
+client.login(process.env.DJS_TOKEN)
